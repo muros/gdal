@@ -508,6 +508,11 @@ void CPL_STDCALL GDALAllRegister()
     GDALRegister_SAGA();
 #endif
 
+/* Register DMV before XYZ (same file extension). */
+#ifdef FRMT_dmv
+    GDALRegister_DMV();
+#endif
+
 #ifdef FRMT_xyz
     GDALRegister_XYZ();
 #endif
