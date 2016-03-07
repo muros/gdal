@@ -1201,6 +1201,8 @@ CPLString OGRPGCommonLayerGetType(OGRFieldDefn& oField,
     {
         if( oField.GetSubType() == OFSTBoolean )
             strcpy( szFieldType, "BOOLEAN[]" );
+        else if( oField.GetSubType() == OFSTInt16 )
+            strcpy( szFieldType, "INT2[]" );
         else
             strcpy( szFieldType, "INTEGER[]" );
     }
@@ -1210,7 +1212,10 @@ CPLString OGRPGCommonLayerGetType(OGRFieldDefn& oField,
     }
     else if( oField.GetType() == OFTRealList )
     {
-        strcpy( szFieldType, "FLOAT8[]" );
+        if( oField.GetSubType() == OFSTFloat32 )
+            strcpy( szFieldType, "REAL[]" );
+        else
+            strcpy( szFieldType, "FLOAT8[]" );
     }
     else if( oField.GetType() == OFTStringList )
     {
@@ -1291,6 +1296,33 @@ int OGRPGCommonLayerSetType(OGRFieldDefn& oField,
         oField.SetSubType( OFSTBoolean );
         oField.SetWidth( 1 );
     }
+    else if( EQUAL(pszType,"_numeric") )
+    {
+        if( EQUAL(pszFormatType, "numeric[]") )
+            oField.SetType( OFTRealList );
+        else
+        {
+            const char *pszPrecision = strstr(pszFormatType,",");
+            int    nPrecision = 0;
+
+            nWidth = atoi(pszFormatType + 8);
+            if( pszPrecision != NULL )
+                nPrecision = atoi(pszPrecision+1);
+
+            if( nPrecision == 0 )
+            {
+                if( nWidth >= 10 )
+                    oField.SetType( OFTInteger64List );
+                else
+                    oField.SetType( OFTIntegerList );
+            }
+            else
+                oField.SetType( OFTRealList );
+
+            oField.SetWidth( nWidth );
+            oField.SetPrecision( nPrecision );
+        }
+    }
     else if( EQUAL(pszType,"numeric") )
     {
         if( EQUAL(pszFormatType, "numeric") )
@@ -1321,6 +1353,11 @@ int OGRPGCommonLayerSetType(OGRFieldDefn& oField,
     else if( EQUAL(pszFormatType,"integer[]") )
     {
         oField.SetType( OFTIntegerList );
+    }
+    else if( EQUAL(pszFormatType,"smallint[]") )
+    {
+        oField.SetType( OFTIntegerList );
+        oField.SetSubType( OFSTInt16 );
     }
     else if( EQUAL(pszFormatType,"boolean[]") )
     {
@@ -1619,6 +1656,7 @@ OGRErr OGRPGDumpLayer::CreateGeomField( OGRGeomFieldDefn *poGeomFieldIn,
                                    GeometryTypeFlags & OGRGeometry::OGR_G_3D, 
                                    GeometryTypeFlags & OGRGeometry::OGR_G_MEASURED);
     }
+    poGeomField->SetType(eType);
     poGeomField->GeometryTypeFlags = GeometryTypeFlags;
 
 /* -------------------------------------------------------------------- */
@@ -1717,4 +1755,73 @@ void OGRPGDumpLayer::SetOverrideColumnTypes( const char* pszOverrideColumnTypes 
     }
     if( osCur.size() )
         papszOverrideColumnTypes = CSLAddString(papszOverrideColumnTypes, osCur);
+}
+
+/************************************************************************/
+/*                              SetMetadata()                           */
+/************************************************************************/
+
+CPLErr OGRPGDumpLayer::SetMetadata(char** papszMD, const char* pszDomain)
+{
+    OGRLayer::SetMetadata(papszMD, pszDomain);
+    if( osForcedDescription.size() != 0 &&
+        (pszDomain == NULL || EQUAL(pszDomain, "")) )
+    {
+        OGRLayer::SetMetadataItem("DESCRIPTION", osForcedDescription);
+    }
+
+    if( (pszDomain == NULL || EQUAL(pszDomain, "")) &&
+        osForcedDescription.size() == 0 )
+    {
+        const char* l_pszDescription = OGRLayer::GetMetadataItem("DESCRIPTION");
+        CPLString osCommand;
+
+        osCommand.Printf( "COMMENT ON TABLE %s IS %s",
+                           pszSqlTableName,
+                           l_pszDescription && l_pszDescription[0] != '\0' ?
+                              OGRPGDumpEscapeString(l_pszDescription).c_str() : "NULL" );
+        poDS->Log( osCommand );
+    }
+
+    return CE_None;
+}
+
+/************************************************************************/
+/*                            SetMetadataItem()                         */
+/************************************************************************/
+
+CPLErr OGRPGDumpLayer::SetMetadataItem(const char* pszName, const char* pszValue,
+                                       const char* pszDomain)
+{
+    if( (pszDomain == NULL || EQUAL(pszDomain, "")) && pszName != NULL &&
+        EQUAL(pszName, "DESCRIPTION") && osForcedDescription.size() )
+    {
+        return CE_None;
+    }
+    OGRLayer::SetMetadataItem(pszName, pszValue, pszDomain);
+    if( (pszDomain == NULL || EQUAL(pszDomain, "")) && pszName != NULL &&
+        EQUAL(pszName, "DESCRIPTION") )
+    {
+        SetMetadata( GetMetadata() );
+    }
+    return CE_None;
+}
+
+/************************************************************************/
+/*                      SetForcedDescription()                          */
+/************************************************************************/
+
+void OGRPGDumpLayer::SetForcedDescription( const char* pszDescriptionIn )
+{
+    osForcedDescription = pszDescriptionIn;
+    OGRLayer::SetMetadataItem("DESCRIPTION", osForcedDescription);
+
+    if( pszDescriptionIn[0] != '\0' )
+    {
+        CPLString osCommand;
+        osCommand.Printf( "COMMENT ON TABLE %s IS %s",
+                            pszSqlTableName,
+                            OGRPGDumpEscapeString(pszDescriptionIn).c_str() );
+        poDS->Log( osCommand );
+    }
 }

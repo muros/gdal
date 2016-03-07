@@ -835,11 +835,11 @@ def ogr_gpkg_16():
     ds = gdaltest.gpkg_dr.CreateDataSource('/vsimem/ogr_gpk_16.gpkg')
     ds.CreateLayer('foo')
     ds.ExecuteSQL("INSERT INTO gpkg_extensions ( table_name, column_name, " + \
-        "extension_name, definition, scope ) VALUES ( 'foo', 'geom', 'gpkg_geom_CURVE', 'some ext', 'write-only' ) ")
+        "extension_name, definition, scope ) VALUES ( 'foo', 'geom', 'gpkg_geom_XXXX', 'some ext', 'read-write' ) ")
     ds = None
 
     gdal.PushErrorHandler('CPLQuietErrorHandler')
-    ds = ogr.Open('/vsimem/ogr_gpk_16.gpkg', update = 1)
+    ds = ogr.Open('/vsimem/ogr_gpk_16.gpkg')
     gdal.PopErrorHandler()
     if gdal.GetLastErrorMsg() == '':
         gdaltest.post_reason('fail : warning expected')
@@ -980,6 +980,17 @@ def ogr_gpkg_18():
         gdaltest.post_reason('fail')
         return 'fail'
 
+    ds = None
+
+    ds = ogr.Open('/vsimem/ogr_gpkg_18.gpkg', update = 1)
+    lyr = ds.GetLayer(0)
+    f = ogr.Feature(lyr.GetLayerDefn())
+    f.SetGeometry(ogr.CreateGeometryFromWkt('CIRCULARSTRING(0 0,1 0,0 0)'))
+    ret = lyr.CreateFeature(f)
+    if ret != 0 or gdal.GetLastErrorMsg() != '':
+        gdaltest.post_reason('fail')
+        return 'fail'
+    f = None
     ds = None
 
     gdal.Unlink('/vsimem/ogr_gpkg_18.gpkg')
@@ -1993,6 +2004,38 @@ def ogr_gpkg_29():
     return 'success'
 
 
+###############################################################################
+# Tes non standard file extension (#6396)
+
+def ogr_gpkg_30():
+
+    if gdaltest.gpkg_dr is None:
+        return 'skip'
+
+    with gdaltest.error_handler():
+        ds = gdaltest.gpkg_dr.CreateDataSource('/vsimem/ogr_gpkg_30.geopkg')
+    if ds is None:
+        gdaltest.post_reason('fail')
+        return 'fail'
+    if gdal.GetLastErrorMsg() == '':
+        gdaltest.post_reason('fail')
+        return 'fail'
+    ds = None
+
+    with gdaltest.error_handler():
+        ds = ogr.Open('/vsimem/ogr_gpkg_30.geopkg')
+    if ds is None:
+        gdaltest.post_reason('fail')
+        return 'fail'
+    if gdal.GetLastErrorMsg() == '':
+        gdaltest.post_reason('fail')
+        return 'fail'
+    ds = None
+
+    with gdaltest.error_handler():
+        gdaltest.gpkg_dr.DeleteDataSource('/vsimem/ogr_gpkg_30.geopkg')
+
+    return 'success'
 
 ###############################################################################
 # Run test_ogrsf
@@ -2081,6 +2124,7 @@ gdaltest_list = [
     ogr_gpkg_27,
     ogr_gpkg_28,
     ogr_gpkg_29,
+    ogr_gpkg_30,
     ogr_gpkg_test_ogrsf,
     ogr_gpkg_cleanup,
 ]
