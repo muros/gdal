@@ -193,6 +193,15 @@ DMVRasterBand::DMVRasterBand(DMVDataset *poDS, int nBand)
 		parseXyzLine(lline, &data);
 		int bandY = (int) ((data.x - poDS->GetRasterYOrigin()) / 5);
 		int bandX = (int) ((data.y - poDS->GetRasterXOrigin()) / 5);
+		// TODO What to do with overshoots, skip or move down a pixel?
+		if (bandY >= poDS->GetRasterYSize()) {
+		    printf("Line %d Band Y overshoot %d\n", lineCnt, bandY);
+			bandY = poDS->GetRasterYSize() - 1;
+		}
+		if (bandX >= poDS->GetRasterXSize()) {
+		    printf("Line %d Band X overshoot %d\n", lineCnt, bandX);
+			bandX = poDS->GetRasterXSize() - 1;
+		}
 		band[bandY][bandX] = data.z;
 
 		lline[0] = '\n';

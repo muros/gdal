@@ -86,3 +86,5 @@ html/
 nmake.local
 *~
 *tmp
+.cproject
+.project
