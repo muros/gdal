@@ -2564,7 +2564,7 @@ GDALOpen( const char * pszFilename, GDALAccess eAccess )
  * the papszSiblingFiles parameter.
  * This is the list of all files at the same level in the file system as the
  * target file, including the target file. The filenames must not include any
- * path components, are an essentially just the output of CPLReadDir() on the
+ * path components, are an essentially just the output of VSIReadDir() on the
  * parent directory. If the target object does not have filesystem semantics
  * then the file list should be NULL.
  *
@@ -3235,7 +3235,7 @@ void CPL_STDCALL GDALEndAsyncReader(GDALDatasetH hDS, GDALAsyncReaderH hAsyncRea
 {
     VALIDATE_POINTER0( hDS, "GDALDataset" );
     VALIDATE_POINTER0( hAsyncReaderH, "GDALAsyncReader" );
-    ((GDALDataset *) hDS) -> EndAsyncReader((GDALAsyncReader *)hAsyncReaderH);	
+    ((GDALDataset *) hDS) -> EndAsyncReader((GDALAsyncReader *)hAsyncReaderH);
 }
 
 /************************************************************************/

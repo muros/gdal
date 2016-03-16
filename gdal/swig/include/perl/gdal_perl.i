@@ -127,6 +127,7 @@ use strict;
 use warnings;
 use Carp;
 use Encode;
+use Exporter 'import';
 use Geo::GDAL::Const;
 use Geo::OGR;
 use Geo::OSR;
@@ -161,12 +162,12 @@ Geo::GDAL - Perl extension for the GDAL library for geospatial data
   my $raster_data = $dataset->GetRasterBand(1)->ReadTile;
 
   my $vector_datasource = Geo::OGR::Open('./');
- 
+
   my $vector_layer = $datasource->Layer('borders'); # e.g. a shapefile borders.shp in current directory
 
   $vector_layer->ResetReading();
-  while (my $feature = $vector_layer->GetNextFeature()) {  
-      my $geometry = $feature->GetGeometry(); 
+  while (my $feature = $vector_layer->GetNextFeature()) {
+      my $geometry = $feature->GetGeometry();
       my $value = $feature->GetField($field);
   }
 
@@ -207,6 +208,7 @@ L<https://trac.osgeo.org/gdal>
 
 use Scalar::Util 'blessed';
 use vars qw/
+    @EXPORT_OK %EXPORT_TAGS
     @DATA_TYPES @OPEN_FLAGS @RESAMPLING_TYPES @RIO_RESAMPLING_TYPES @NODE_TYPES
     %TYPE_STRING2INT %TYPE_INT2STRING
     %OF_STRING2INT
@@ -215,6 +217,9 @@ use vars qw/
     %NODE_TYPE_STRING2INT %NODE_TYPE_INT2STRING
     @error %stdout_redirection
     /;
+@EXPORT_OK = qw/Driver Open BuildVRT/;
+%EXPORT_TAGS = (all => [qw(Driver Open BuildVRT)]);
+*BuildVRT = *Geo::GDAL::Dataset::BuildVRT;
 for (keys %Geo::GDAL::Const::) {
     next if /TypeCount/;
     push(@DATA_TYPES, $1), next if /^GDT_(\w+)/;
@@ -287,7 +292,7 @@ sub errstr {
     return join("\n", @stack);
 }
 
-# usage: named_parameters(\@_, key value list of default parameters); 
+# usage: named_parameters(\@_, key value list of default parameters);
 # returns parameters in a hash with low-case-without-_ keys
 sub named_parameters {
     my $parameters = shift;
@@ -449,7 +454,7 @@ sub GetDriver {
     $driver //= GetDriverByName("$name");
     Geo::GDAL::error(2, $name, 'Driver') unless $driver;
     return $driver;
-    
+
 }
 *Driver = *GetDriver;
 
@@ -458,14 +463,20 @@ sub AccessTypes {
 }
 
 sub Open {
-    my @p = @_; # name, update
-    my @flags = qw/RASTER/;
-    $p[1] //= 'ReadOnly';
-    Geo::GDAL::error(1, $p[1], {ReadOnly => 1, Update => 1}) unless ($p[1] eq 'ReadOnly' or $p[1] eq 'Update'); 
-    push @flags, qw/READONLY/ if $p[1] eq 'ReadOnly';
-    push @flags, qw/UPDATE/ if $p[1] eq 'Update';
-    my $dataset = OpenEx($p[0], \@flags);
-    error("Failed to open $p[0]. Is it a raster dataset?") unless $dataset;
+    my $p = Geo::GDAL::named_parameters(\@_, Name => '.', Access => 'ReadOnly', Type => 'Any', Options => {}, Files => []);
+    my @flags;
+    my %o = (READONLY => 1, UPDATE => 1);
+    Geo::GDAL::error(1, $p->{access}, \%o) unless $o{uc($p->{access})};
+    push @flags, uc($p->{access});
+    %o = (RASTER => 1, VECTOR => 1, ANY => 1);
+    Geo::GDAL::error(1, $p->{type}, \%o) unless $o{uc($p->{type})};
+    push @flags, uc($p->{type}) unless uc($p->{type}) eq 'ANY';
+    my $dataset = OpenEx(Name => $p->{name}, Flags => \@flags, Options => $p->{options}, Files => $p->{files});
+    unless ($dataset) {
+        my $t = "Failed to open $p->{name}.";
+        $t .= " Is it a ".lc($p->{type})." dataset?" unless uc($p->{type}) eq 'ANY';
+        error($t);
+    }
     return $dataset;
 }
 
@@ -473,7 +484,7 @@ sub OpenShared {
     my @p = @_; # name, update
     my @flags = qw/RASTER SHARED/;
     $p[1] //= 'ReadOnly';
-    Geo::GDAL::error(1, $p[1], {ReadOnly => 1, Update => 1}) unless ($p[1] eq 'ReadOnly' or $p[1] eq 'Update'); 
+    Geo::GDAL::error(1, $p[1], {ReadOnly => 1, Update => 1}) unless ($p[1] eq 'ReadOnly' or $p[1] eq 'Update');
     push @flags, qw/READONLY/ if $p[1] eq 'ReadOnly';
     push @flags, qw/UPDATE/ if $p[1] eq 'Update';
     my $dataset = OpenEx($p[0], \@flags);
@@ -544,7 +555,7 @@ sub make_processing_options {
             }
         }
         $o = [%$o];
-    } 
+    }
     return $o;
 }
 
@@ -691,8 +702,8 @@ sub Create {
     my $p = Geo::GDAL::named_parameters(\@_, Name => 'unnamed', Width => 256, Height => 256, Bands => 1, Type => 'Byte', Options => {});
     my $type = Geo::GDAL::string2int($p->{type}, \%Geo::GDAL::TYPE_STRING2INT);
     return $self->stdout_redirection_wrapper(
-        $p->{name}, 
-        $self->can('_Create'), 
+        $p->{name},
+        $self->can('_Create'),
         $p->{width}, $p->{height}, $p->{bands}, $type, $p->{options}
     );
 }
@@ -702,8 +713,8 @@ sub Copy {
     my $self = shift;
     my $p = Geo::GDAL::named_parameters(\@_, Name => 'unnamed', Src => undef, Strict => 1, Options => {}, Progress => undef, ProgressData => undef);
     return $self->stdout_redirection_wrapper(
-        $p->{name}, 
-        $self->can('_CreateCopy'), 
+        $p->{name},
+        $self->can('_CreateCopy'),
         $p->{src}, $p->{strict}, $p->{options}, $p->{progress}, $p->{progressdata});
 }
 *CreateCopy = *Copy;
@@ -728,8 +739,10 @@ use warnings;
 use POSIX qw/floor ceil/;
 use Scalar::Util 'blessed';
 use Carp;
+use Exporter 'import';
 
-use vars qw/@DOMAINS @CAPABILITIES %CAPABILITIES %BANDS %LAYERS %RESULT_SET/;
+use vars qw/@EXPORT @DOMAINS @CAPABILITIES %CAPABILITIES %BANDS %LAYERS %RESULT_SET/;
+@EXPORT = qw/BuildVRT/;
 @DOMAINS = qw/IMAGE_STRUCTURE SUBDATASETS GEOLOCATION/;
 
 sub RELEASE_PARENTS {
@@ -827,10 +840,10 @@ sub GetLayerNames {
 sub CreateLayer {
     my $self = shift;
     my $p = Geo::GDAL::named_parameters(\@_,
-                                        Name => 'unnamed', 
-                                        SRS => undef, 
-                                        GeometryType => 'Unknown', 
-                                        Options => {}, 
+                                        Name => 'unnamed',
+                                        SRS => undef,
+                                        GeometryType => 'Unknown',
+                                        Options => {},
                                         Schema => undef,
                                         Fields => undef,
                                         ApproxOK => 1);
@@ -1139,6 +1152,32 @@ sub Rasterize {
     }
 }
 
+sub BuildVRT {
+    my ($dest, $sources, $options, $progress, $progress_data) = @_;
+    $options = Geo::GDAL::GDALBuildVRTOptions->new(Geo::GDAL::make_processing_options($options));
+    Geo::GDAL::error("Usage: Geo::GDAL::DataSet::BuildVRT(\$vrt_file_name, \\\@sources)")
+        unless ref $sources eq 'ARRAY' && defined $sources->[0];
+    unless (blessed($dest)) {
+        if (blessed($sources->[0])) {
+            return Geo::GDAL::wrapper_GDALBuildVRT_objects($dest, $sources, $options, $progress, $progress_data);
+        } else {
+            return Geo::GDAL::wrapper_GDALBuildVRT_names($dest, $sources, $options, $progress, $progress_data);
+        }
+    } else {
+        if (blessed($sources->[0])) {
+            return stdout_redirection_wrapper(
+                $sources, $dest,
+                \&Geo::GDAL::wrapper_GDALBuildVRT_objects,
+                $options, $progress, $progress_data);
+        } else {
+            return stdout_redirection_wrapper(
+                $sources, $dest,
+                \&Geo::GDAL::wrapper_GDALBuildVRT_names,
+                $options, $progress, $progress_data);
+        }
+    }
+}
+
 sub ComputeColorTable {
     my $self = shift;
     my $p = Geo::GDAL::named_parameters(\@_,
@@ -1157,11 +1196,11 @@ sub ComputeColorTable {
         }
     }
     my $ct = Geo::GDAL::ColorTable->new;
-    Geo::GDAL::ComputeMedianCutPCT($p->{red}, 
-                                   $p->{green}, 
-                                   $p->{blue}, 
-                                   $p->{numcolors}, 
-                                   $ct, $p->{progress}, 
+    Geo::GDAL::ComputeMedianCutPCT($p->{red},
+                                   $p->{green},
+                                   $p->{blue},
+                                   $p->{numcolors},
+                                   $ct, $p->{progress},
                                    $p->{progressdata});
     return $ct;
 }
@@ -1184,23 +1223,23 @@ sub Dither {
         }
     }
     my ($w, $h) = $self->Size;
-    $p->{dest} //= Geo::GDAL::Driver('MEM')->Create(Name => 'dithered', 
-                                                    Width => $w, 
-                                                    Height => $h, 
+    $p->{dest} //= Geo::GDAL::Driver('MEM')->Create(Name => 'dithered',
+                                                    Width => $w,
+                                                    Height => $h,
                                                     Type => 'Byte')->Band;
-    $p->{colortable} 
-        //= $p->{dest}->ColorTable 
+    $p->{colortable}
+        //= $p->{dest}->ColorTable
             // $self->ComputeColorTable(Red => $p->{red},
                                         Green => $p->{green},
                                         Blue => $p->{blue},
-                                        Progress => $p->{progress}, 
+                                        Progress => $p->{progress},
                                         ProgressData => $p->{progressdata});
     Geo::GDAL::DitherRGB2PCT($p->{red},
-                             $p->{green}, 
-                             $p->{blue}, 
-                             $p->{dest}, 
-                             $p->{colortable}, 
-                             $p->{progress}, 
+                             $p->{green},
+                             $p->{blue},
+                             $p->{dest},
+                             $p->{colortable},
+                             $p->{progress},
                              $p->{progressdata});
     $p->{dest}->ColorTable($p->{colortable});
     return $p->{dest};
@@ -1536,7 +1575,7 @@ sub Piddle {
     my ($w, $h) = $self->Size;
     my $data = $self->ReadRaster;
     my $pdl = PDL->new;
-    my %map = ( 
+    my %map = (
         Byte => 0,
         UInt16 => 2,
         Int16 => 1,
@@ -1579,7 +1618,7 @@ sub RegenerateOverview {
     my @p = @_;
     Geo::GDAL::RegenerateOverview($self, @p);
 }
- 
+
 sub RegenerateOverviews {
     my $self = shift;
     #arrayref overviews, scalar resampling, subref callback, scalar callback_data
@@ -1595,8 +1634,8 @@ sub Polygonize {
     my $leInt32 = $leInt32{$dt};
     $dt = $dt =~ /Float/ ? 'Real' : 'Integer';
     $p->{outlayer} //= Geo::OGR::Driver('Memory')->Create()->
-        CreateLayer(Name => 'polygonized', 
-                    Fields => [{Name => 'val', Type => $dt}, 
+        CreateLayer(Name => 'polygonized',
+                    Fields => [{Name => 'val', Type => $dt},
                                {Name => 'geom', Type => 'Polygon'}]);
     $p->{pixvalfield} = $p->{outlayer}->GetLayerDefn->GetFieldIndex($p->{pixvalfield});
     $p->{options}{'8CONNECTED'} = $p->{options}{Connectedness} if $p->{options}{Connectedness};
@@ -1985,14 +2024,14 @@ sub FromGCPs {
     Geo::GDAL::error('Usage: Geo::GDAL::GeoTransform::FromGCPs(\@gcps, $approx_ok)') unless @$gcps;
     my $self = Geo::GDAL::GCPsToGeoTransform($gcps, $approx_ok);
     bless $self, 'Geo::GDAL::GetTransform';
-    return $self;    
+    return $self;
 }
 
 sub Apply {
     my ($self, $columns, $rows) = @_;
     my (@x, @y);
     for my $i (0..$#$columns) {
-        ($x[$i], $y[$i]) = 
+        ($x[$i], $y[$i]) =
             Geo::GDAL::ApplyGeoTransform($self, $columns->[$i], $rows->[$i]);
     }
     return (\@x, \@y);
@@ -2098,7 +2137,7 @@ sub traverse {
     my ($self, $sub) = @_;
     my $type = $self->[0];
     my $data = $self->[1];
-    $type = Geo::GDAL::NodeType($type); 
+    $type = Geo::GDAL::NodeType($type);
     $sub->($self, $type, $data);
     for my $child (@{$self}[2..$#$self]) {
         traverse($child, $sub);
@@ -2109,7 +2148,6 @@ sub serialize {
     my $self = shift;
     return Geo::GDAL::SerializeXMLTree($self);
 }
-
 
 %}
 
