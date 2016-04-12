@@ -137,9 +137,111 @@ public:
 
 	DMVRasterBand(DMVDataset *, int);
 	~DMVRasterBand();
+	double calcPixAvg(int, int, int, int);
 
 	virtual CPLErr IReadBlock(int, int, void *);
 };
+
+/*
+ * Calculate average of pixels around location bandY, bandX.
+ */
+double DMVRasterBand::calcPixAvg(int bandY, int bandX, int maxy, int maxx)
+
+{
+	// 1 2 3
+	// 4 X 5
+	// 6 7 8
+	double pixAvg = 0;
+	double pixSum = 0;
+	int pixCnt = 0;
+	int x, y;
+
+	// 1
+	y = bandY - 1;
+	x = bandX - 1;
+	if ((y > 0) && (y < maxy) &&
+		(x > 0) && (x < maxx)) {
+		if (band[y][x] > 0) {
+			pixSum += band[y][x];
+			pixCnt++;
+		}
+	}
+	// 2
+	y = bandY - 1;
+	x = bandX;
+	if ((y > 0) && (y < maxy) &&
+		(x > 0) && (x < maxx)) {
+		if (band[y][x] > 0) {
+			pixSum += band[y][x];
+			pixCnt++;
+		}
+	}
+	// 3
+	y = bandY - 1;
+	x = bandX + 1;
+	if ((y > 0) && (y < maxy) &&
+		(x > 0) && (x < maxx)) {
+		if (band[y][x] > 0) {
+			pixSum += band[y][x];
+			pixCnt++;
+		}
+	}
+	// 4
+	y = bandY;
+	x = bandX - 1;
+	if ((y > 0) && (y < maxy) &&
+		(x > 0) && (x < maxx)) {
+		if (band[y][x] > 0) {
+			pixSum += band[y][x];
+			pixCnt++;
+		}
+	}
+	// 5
+	y = bandY;
+	x = bandX + 1;
+	if ((y > 0) && (y < maxy) &&
+		(x > 0) && (x < maxx)) {
+		if (band[y][x] > 0) {
+			pixSum += band[y][x];
+			pixCnt++;
+		}
+	}
+	// 6
+	y = bandY + 1;
+	x = bandX - 1;
+	if ((y > 0) && (y < maxy) &&
+		(x > 0) && (x < maxx)) {
+		if (band[y][x] > 0) {
+			pixSum += band[y][x];
+			pixCnt++;
+		}
+	}
+	// 7
+	y = bandY + 1;
+	x = bandX;
+	if ((y > 0) && (y < maxy) &&
+		(x > 0) && (x < maxx)) {
+		if (band[y][x] > 0) {
+			pixSum += band[y][x];
+			pixCnt++;
+		}
+	}
+	// 8
+	y = bandY + 1;
+	x = bandX + 1;
+	if ((y > 0) && (y < maxy) &&
+		(x > 0) && (x < maxx)) {
+		if (band[y][x] > 0) {
+			pixSum += band[y][x];
+			pixCnt++;
+		}
+	}
+
+	pixAvg = pixSum / pixCnt;
+
+	return pixAvg;
+}
+
 
 /************************************************************************/
 /*                           DMVRasterBand()                            */
@@ -195,14 +297,26 @@ DMVRasterBand::DMVRasterBand(DMVDataset *poDS, int nBand)
 		int bandX = (int) ((data.y - poDS->GetRasterXOrigin()) / 5);
 		// TODO What to do with overshoots, skip or move down a pixel?
 		if (bandY >= poDS->GetRasterYSize()) {
-		    printf("Line %d Band Y overshoot %d\n", lineCnt, bandY);
+			printf("Line %d Band Y overshoot %d\n", lineCnt, bandY);
 			bandY = poDS->GetRasterYSize() - 1;
 		}
 		if (bandX >= poDS->GetRasterXSize()) {
-		    printf("Line %d Band X overshoot %d\n", lineCnt, bandX);
+			printf("Line %d Band X overshoot %d\n", lineCnt, bandX);
 			bandX = poDS->GetRasterXSize() - 1;
 		}
-		band[bandY][bandX] = data.z;
+		// There is duplicate erroneous data. Why is there such data?
+		//printf("%ld : %ld, %ld = %.2lf\n", lineCnt, bandY, bandX, data.z);
+		double pixAvg = calcPixAvg(bandY, bandX, poDS->GetRasterYSize(), poDS->GetRasterXSize());
+		if (pixAvg == 0) {
+			band[bandY][bandX] = data.z;
+		} else {
+			double delta = abs(data.z - pixAvg);
+			if (delta > 30) {
+				//printf("Delta %ld : %ld, %ld = %.2lf\n", lineCnt, bandY, bandX, delta);
+			} else {
+				band[bandY][bandX] = data.z;
+			}
+		}
 
 		lline[0] = '\n';
 		if (data.x > maxx)
