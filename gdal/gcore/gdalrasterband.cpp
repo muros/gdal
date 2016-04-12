@@ -240,7 +240,9 @@ CPLErr GDALRasterBand::RasterIO( GDALRWFlag eRWFlag,
 /*      value assuming a packed buffer.                                 */
 /* -------------------------------------------------------------------- */
     if( nPixelSpace == 0 )
-        nPixelSpace = GDALGetDataTypeSize( eBufType ) / 8;
+    {
+        nPixelSpace = GDALGetDataTypeSizeBytes( eBufType );
+    }
 
     if( nLineSpace == 0 )
     {
@@ -364,10 +366,10 @@ GDALRasterIOEx( GDALRasterBandH hBand, GDALRWFlag eRWFlag,
  * block oriented data without an extra copy into an application buffer.
  *
  * @param nXBlockOff the horizontal block offset, with zero indicating
- * the left most block, 1 the next block and so forth.
+ * the leftmost block, 1 the next block and so forth.
  *
  * @param nYBlockOff the vertical block offset, with zero indicating
- * the left most block, 1 the next block and so forth.
+ * the topmost block, 1 the next block and so forth.
  *
  * @param pImage the buffer into which the data will be read.  The buffer
  * must be large enough to hold GetBlockXSize()*GetBlockYSize() words
@@ -751,7 +753,7 @@ int GDALRasterBand::InitBlockInfo()
         return FALSE;
     }
 
-    const int nDataTypeSize = GDALGetDataTypeSize(eDataType) / 8;
+    const int nDataTypeSize = GDALGetDataTypeSizeBytes(eDataType);
     if( nDataTypeSize == 0 )
     {
         ReportError( CE_Failure, CPLE_AppDefined, "Invalid data type" );
@@ -1211,7 +1213,7 @@ CPLErr GDALRasterBand::Fill(double dfRealValue, double dfImaginaryValue) {
 
     // Allocate the source block
     int blockSize = nBlockXSize * nBlockYSize;
-    int elementSize = GDALGetDataTypeSize(eDataType) / 8;
+    int elementSize = GDALGetDataTypeSizeBytes(eDataType);
     int blockByteSize = blockSize * elementSize;
     unsigned char* srcBlock = (unsigned char*) VSIMalloc(blockByteSize);
     if (srcBlock == NULL) {
@@ -1461,7 +1463,7 @@ GDALGetRasterNoDataValue( GDALRasterBandH hBand, int *pbSuccess )
  *
  * Depending on drivers, changing the no data value may or may not have an
  * effect on the pixel values of a raster that has just been created. It is
- * thus advised to explictly called Fill() if the intent is to initialize
+ * thus advised to explicitly called Fill() if the intent is to initialize
  * the raster to the nodata value.
  * In ay case, changing an existing no data value, when one already exists and
  * the dataset exists or has been initialized, has no effect on the pixel whose
@@ -1497,7 +1499,7 @@ CPLErr GDALRasterBand::SetNoDataValue( CPL_UNUSED double dfNoData )
  *
  * Depending on drivers, changing the no data value may or may not have an
  * effect on the pixel values of a raster that has just been created. It is
- * thus advised to explictly called Fill() if the intent is to initialize
+ * thus advised to explicitly called Fill() if the intent is to initialize
  * the raster to the nodata value.
  * In ay case, changing an existing no data value, when one already exists and
  * the dataset exists or has been initialized, has no effect on the pixel whose
@@ -2764,7 +2766,8 @@ CPLErr GDALRasterBand::GetHistogram( double dfMin, double dfMax,
         }
 
         void *pData =
-            CPLMalloc(GDALGetDataTypeSize(eDataType)/8 * nXReduced * nYReduced);
+            CPLMalloc(
+                GDALGetDataTypeSizeBytes(eDataType) * nXReduced * nYReduced );
 
         CPLErr eErr = IRasterIO( GF_Read, 0, 0, nRasterXSize, nRasterYSize, pData,
                    nXReduced, nYReduced, eDataType, 0, 0, &sExtraArg );
@@ -3662,7 +3665,8 @@ GDALRasterBand::ComputeStatistics( int bApproxOK,
         }
 
         pData =
-            CPLMalloc(GDALGetDataTypeSize(eDataType)/8 * nXReduced * nYReduced);
+            CPLMalloc(
+                GDALGetDataTypeSizeBytes(eDataType) * nXReduced * nYReduced );
 
         CPLErr eErr = IRasterIO( GF_Read, 0, 0, nRasterXSize, nRasterYSize, pData,
                    nXReduced, nYReduced, eDataType, 0, 0, &sExtraArg );
@@ -4138,7 +4142,8 @@ CPLErr GDALRasterBand::ComputeRasterMinMax( int bApproxOK,
         }
 
         pData =
-            CPLMalloc(GDALGetDataTypeSize(eDataType)/8 * nXReduced * nYReduced);
+            CPLMalloc(
+                GDALGetDataTypeSizeBytes(eDataType) * nXReduced * nYReduced );
 
         CPLErr eErr = IRasterIO( GF_Read, 0, 0, nRasterXSize, nRasterYSize, pData,
                    nXReduced, nYReduced, eDataType, 0, 0, &sExtraArg );
@@ -5226,7 +5231,7 @@ CPLVirtualMem  *GDALRasterBand::GetVirtualMemAuto( GDALRWFlag eRWFlag,
                                                    GIntBig *pnLineSpace,
                                                    char **papszOptions )
 {
-    int nPixelSpace = GDALGetDataTypeSize(eDataType) / 8;
+    const int nPixelSpace = GDALGetDataTypeSizeBytes(eDataType);
     GIntBig nLineSpace = (GIntBig)nRasterXSize * nPixelSpace;
     if( pnPixelSpace )
         *pnPixelSpace = nPixelSpace;

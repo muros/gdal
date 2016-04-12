@@ -65,17 +65,24 @@ typedef enum
 /* between CPLErr and CPLErrorNum */
 typedef enum
 {
- CPLE_None,
- CPLE_AppDefined,
- CPLE_OutOfMemory,
- CPLE_FileIO,
- CPLE_OpenFailed,
- CPLE_IllegalArg,
- CPLE_NotSupported,
- CPLE_AssertionFailed,
- CPLE_NoWriteAccess,
- CPLE_UserInterrupt,
- CPLE_ObjectNull,
+  CPLE_None,
+  CPLE_AppDefined,
+  CPLE_OutOfMemory,
+  CPLE_FileIO,
+  CPLE_OpenFailed,
+  CPLE_IllegalArg,
+  CPLE_NotSupported,
+  CPLE_AssertionFailed,
+  CPLE_NoWriteAccess,
+  CPLE_UserInterrupt,
+  CPLE_ObjectNull,
+  CPLE_HttpResponse,
+  CPLE_HttpResponse,
+  CPLE_AWSBucketNotFound,
+  CPLE_AWSObjectNotFound,
+  CPLE_AWSAccessDenied,
+  CPLE_AWSInvalidCredentials,
+  CPLE_AWSSignatureDoesNotMatch,
 } CPLErrorNum;
 
 #else
@@ -93,6 +100,16 @@ typedef int CPLErrorNum;
 #define CPLE_NoWriteAccess              8
 #define CPLE_UserInterrupt              9
 #define CPLE_ObjectNull                 10
+
+/*
+ * Filesystem-specific errors
+ */
+#define CPLE_HttpResponse               11
+#define CPLE_AWSBucketNotFound          12
+#define CPLE_AWSObjectNotFound          13
+#define CPLE_AWSAccessDenied            14
+#define CPLE_AWSInvalidCredentials      15
+#define CPLE_AWSSignatureDoesNotMatch    16
 
 /* 100 - 299 reserved for GDAL */
 
@@ -120,6 +137,7 @@ CPLErrorHandler CPL_DLL CPL_STDCALL CPLSetErrorHandler(CPLErrorHandler);
 CPLErrorHandler CPL_DLL CPL_STDCALL CPLSetErrorHandlerEx(CPLErrorHandler, void*);
 void CPL_DLL CPL_STDCALL CPLPushErrorHandler( CPLErrorHandler );
 void CPL_DLL CPL_STDCALL CPLPushErrorHandlerEx( CPLErrorHandler, void* );
+void CPL_DLL CPL_STDCALL CPLSetCurrentErrorHandlerCatchDebug( int bCatchDebug );
 void CPL_DLL CPL_STDCALL CPLPopErrorHandler(void);
 
 void CPL_DLL CPL_STDCALL CPLDebug( const char *, const char *, ... )  CPL_PRINT_FUNC_FORMAT (2, 3);

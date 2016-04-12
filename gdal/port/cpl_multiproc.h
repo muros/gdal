@@ -89,7 +89,9 @@ void  CPL_DLL  CPLCondSignal( CPLCond *hCond );
 void  CPL_DLL  CPLCondBroadcast( CPLCond *hCond );
 void  CPL_DLL  CPLDestroyCond( CPLCond *hCond );
 
+/** Contrary to what its name suggests, CPLGetPID() actually returns the thread id */
 GIntBig CPL_DLL CPLGetPID( void );
+int CPL_DLL CPLGetCurrentProcessID( void );
 int   CPL_DLL CPLCreateThread( CPLThreadFunc pfnMain, void *pArg );
 CPLJoinableThread  CPL_DLL* CPLCreateJoinableThread( CPLThreadFunc pfnMain, void *pArg );
 void  CPL_DLL CPLJoinThread(CPLJoinableThread* hJoinableThread);
@@ -196,23 +198,24 @@ class CPL_DLL CPLLockHolder
 /*      Thread local storage.                                           */
 /* -------------------------------------------------------------------- */
 
-#define CTLS_RLBUFFERINFO     		1         /* cpl_conv.cpp */
-#define CTLS_WIN32_COND                 2         /* cpl_multiproc.cpp */
-#define CTLS_CSVTABLEPTR                3         /* cpl_csv.cpp */
-#define CTLS_CSVDEFAULTFILENAME         4         /* cpl_csv.cpp */
-#define CTLS_ERRORCONTEXT               5         /* cpl_error.cpp */
+#define CTLS_RLBUFFERINFO                1         /* cpl_conv.cpp */
+#define CTLS_WIN32_COND                  2         /* cpl_multiproc.cpp */
+#define CTLS_CSVTABLEPTR                 3         /* cpl_csv.cpp */
+#define CTLS_CSVDEFAULTFILENAME          4         /* cpl_csv.cpp */
+#define CTLS_ERRORCONTEXT                5         /* cpl_error.cpp */
 #define CTLS_GDALDATASET_REC_PROTECT_MAP 6        /* gdaldataset.cpp */
-#define CTLS_PATHBUF                    7         /* cpl_path.cpp */
-#define CTLS_UNUSED3                    8
-#define CTLS_UNUSED4                    9
-#define CTLS_CPLSPRINTF                10         /* cpl_string.h */
-#define CTLS_RESPONSIBLEPID            11         /* gdaldataset.cpp */
-#define CTLS_VERSIONINFO               12         /* gdal_misc.cpp */
-#define CTLS_VERSIONINFO_LICENCE       13         /* gdal_misc.cpp */
-#define CTLS_CONFIGOPTIONS             14         /* cpl_conv.cpp */
-#define CTLS_FINDFILE                  15         /* cpl_findfile.cpp */
+#define CTLS_PATHBUF                     7         /* cpl_path.cpp */
+#define CTLS_UNUSED3                     8
+#define CTLS_UNUSED4                     9
+#define CTLS_CPLSPRINTF                 10         /* cpl_string.h */
+#define CTLS_RESPONSIBLEPID             11         /* gdaldataset.cpp */
+#define CTLS_VERSIONINFO                12         /* gdal_misc.cpp */
+#define CTLS_VERSIONINFO_LICENCE        13         /* gdal_misc.cpp */
+#define CTLS_CONFIGOPTIONS              14         /* cpl_conv.cpp */
+#define CTLS_FINDFILE                   15         /* cpl_findfile.cpp */
+#define CTLS_VSIERRORCONTEXT            16         /* cpl_vsi_error.cpp */
 
-#define CTLS_MAX                       32
+#define CTLS_MAX                        32
 
 CPL_C_START
 void CPL_DLL * CPLGetTLS( int nIndex );

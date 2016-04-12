@@ -75,8 +75,11 @@ public:
                               VSIStdinFilesystemHandler();
     virtual                  ~VSIStdinFilesystemHandler();
 
+    using VSIFilesystemHandler::Open;
+
     virtual VSIVirtualHandle *Open( const char *pszFilename,
-                                    const char *pszAccess);
+                                    const char *pszAccess,
+                                    bool bSetError );
     virtual int               Stat( const char *pszFilename,
                                     VSIStatBufL *pStatBuf, int nFlags );
 };
@@ -331,7 +334,8 @@ VSIStdinFilesystemHandler::~VSIStdinFilesystemHandler()
 
 VSIVirtualHandle *
 VSIStdinFilesystemHandler::Open( const char *pszFilename,
-                                 const char *pszAccess )
+                                 const char *pszAccess,
+                                 bool /* bSetError */ )
 
 {
     if (strcmp(pszFilename, "/vsistdin/") != 0)

@@ -397,13 +397,13 @@ CPLXMLNode *VRTSimpleSource::SerializeToXML( const char *pszVRTPath )
         || m_dfSrcYSize != -1 )
     {
         CPLSetXMLValue( psSrc, "SrcRect.#xOff",
-                        CPLSPrintf( "%g", m_dfSrcXOff ) );
+                        CPLSPrintf( "%.15g", m_dfSrcXOff ) );
         CPLSetXMLValue( psSrc, "SrcRect.#yOff",
-                        CPLSPrintf( "%g", m_dfSrcYOff ) );
+                        CPLSPrintf( "%.15g", m_dfSrcYOff ) );
         CPLSetXMLValue( psSrc, "SrcRect.#xSize",
-                        CPLSPrintf( "%g", m_dfSrcXSize ) );
+                        CPLSPrintf( "%.15g", m_dfSrcXSize ) );
         CPLSetXMLValue( psSrc, "SrcRect.#ySize",
-                        CPLSPrintf( "%g", m_dfSrcYSize ) );
+                        CPLSPrintf( "%.15g", m_dfSrcYSize ) );
     }
 
     if( m_dfDstXOff != -1
@@ -411,10 +411,10 @@ CPLXMLNode *VRTSimpleSource::SerializeToXML( const char *pszVRTPath )
         || m_dfDstXSize != -1
         || m_dfDstYSize != -1 )
     {
-        CPLSetXMLValue( psSrc, "DstRect.#xOff", CPLSPrintf( "%g", m_dfDstXOff ) );
-        CPLSetXMLValue( psSrc, "DstRect.#yOff", CPLSPrintf( "%g", m_dfDstYOff ) );
-        CPLSetXMLValue( psSrc, "DstRect.#xSize",CPLSPrintf( "%g", m_dfDstXSize ));
-        CPLSetXMLValue( psSrc, "DstRect.#ySize",CPLSPrintf( "%g", m_dfDstYSize ));
+        CPLSetXMLValue( psSrc, "DstRect.#xOff", CPLSPrintf( "%.15g", m_dfDstXOff ) );
+        CPLSetXMLValue( psSrc, "DstRect.#yOff", CPLSPrintf( "%.15g", m_dfDstYOff ) );
+        CPLSetXMLValue( psSrc, "DstRect.#xSize",CPLSPrintf( "%.15g", m_dfDstXSize ));
+        CPLSetXMLValue( psSrc, "DstRect.#ySize",CPLSPrintf( "%.15g", m_dfDstYSize ));
     }
 
     return psSrc;
@@ -1843,10 +1843,23 @@ CPLXMLNode *VRTComplexSource::SerializeToXML( const char *pszVRTPath )
 
     if ( m_nLUTItemCount )
     {
-        CPLString osLUT = CPLString().Printf("%g:%g", m_padfLUTInputs[0], m_padfLUTOutputs[0]);
+        // Make sure we print with sufficient precision to address really close
+        // entries (#6422)
+        CPLString osLUT;
+        if( m_nLUTItemCount > 0 &&
+            CPLString().Printf("%g", m_padfLUTInputs[0]) == CPLString().Printf("%g", m_padfLUTInputs[1]) )
+            osLUT = CPLString().Printf("%.18g:%g", m_padfLUTInputs[0], m_padfLUTOutputs[0]);
+        else
+            osLUT = CPLString().Printf("%g:%g", m_padfLUTInputs[0], m_padfLUTOutputs[0]);
         int i;
         for ( i = 1; i < m_nLUTItemCount; i++ )
-            osLUT += CPLString().Printf(",%g:%g", m_padfLUTInputs[i], m_padfLUTOutputs[i]);
+        {
+            if( CPLString().Printf("%g", m_padfLUTInputs[i]) == CPLString().Printf("%g", m_padfLUTInputs[i-1]) ||
+                (i + 1 < m_nLUTItemCount && CPLString().Printf("%g", m_padfLUTInputs[i]) == CPLString().Printf("%g", m_padfLUTInputs[i+1])) )
+                osLUT += CPLString().Printf(",%.18g:%g", m_padfLUTInputs[i], m_padfLUTOutputs[i]);
+            else
+                osLUT += CPLString().Printf(",%g:%g", m_padfLUTInputs[i], m_padfLUTOutputs[i]);
+        }
         CPLSetXMLValue( psSrc, "LUT", osLUT );
     }
 

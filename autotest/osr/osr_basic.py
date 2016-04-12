@@ -40,7 +40,7 @@ from osgeo import osr
 
 
 ###############################################################################
-# Create a UTM WGS84 coordinate system and check various items. 
+# Create a UTM WGS84 coordinate system and check various items.
 
 def osr_basic_1():
 
@@ -199,7 +199,7 @@ def osr_basic_4():
 
     srs = osr.SpatialReference()
     srs.SetGS( cm = -117.0, fe = 100000.0, fn = 100000 )
-    srs.SetGeogCS( 'Test GCS', 'Test Datum', 'WGS84', 
+    srs.SetGeogCS( 'Test GCS', 'Test Datum', 'WGS84',
                    osr.SRS_WGS84_SEMIMAJOR, osr.SRS_WGS84_INVFLATTENING )
 
     srs.SetTOWGS84( 1, 2, 3 )
@@ -675,6 +675,41 @@ def osr_basic_19():
     return 'success'
 
 ###############################################################################
+# Test GetAxisName() and GetAxisOrientation() and GetAngularUnitsName()
+
+def osr_basic_20():
+
+    sr = osr.SpatialReference()
+    sr.ImportFromEPSGA(4326)
+
+    if sr.GetAxisName(None, 0) != 'Latitude':
+        gdaltest.post_reason('fail')
+        print(sr.GetAxisName(None, 0))
+        return 'fail'
+
+    if sr.GetAxisOrientation(None, 0) != osr.OAO_North:
+        gdaltest.post_reason('fail')
+        print(sr.GetAxisOrientation(None, 0))
+        return 'fail'
+
+    if sr.GetAxisName('GEOGCS', 1) != 'Longitude':
+        gdaltest.post_reason('fail')
+        print(sr.GetAxisName('GEOGCS', 1))
+        return 'fail'
+
+    if sr.GetAxisOrientation('GEOGCS', 1) != osr.OAO_East:
+        gdaltest.post_reason('fail')
+        print(sr.GetAxisOrientation('GEOGCS', 1))
+        return 'fail'
+
+    if sr.GetAngularUnitsName() != 'degree':
+        gdaltest.post_reason('fail')
+        print(sr.GetAngularUnitsName())
+        return 'fail'
+
+    return 'success'
+
+###############################################################################
 
 gdaltest_list = [
     osr_basic_1,
@@ -696,6 +731,7 @@ gdaltest_list = [
     osr_basic_17,
     osr_basic_18,
     osr_basic_19,
+    osr_basic_20,
     None ]
 
 if __name__ == '__main__':

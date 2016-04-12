@@ -68,7 +68,7 @@ char **VSIReadDir(const char *pszPath)
 }
 
 /************************************************************************/
-/*                             VSIReadDir()                             */
+/*                             VSIReadDirEx()                           */
 /************************************************************************/
 
 /**
@@ -89,7 +89,8 @@ char **VSIReadDir(const char *pszPath)
  *
  * @param pszPath the relative, or absolute path of a directory to read.
  * UTF-8 encoded.
- * @param nMaxFiles maximum number of files after which to stop, or 0 for no limit.
+ * @param nMaxFiles maximum number of files after which to stop, or 0 for no
+ * limit.
  * @return The list of entries in the directory, or NULL if the directory
  * doesn't exist.  Filenames are returned in UTF-8 encoding.
  * @since GDAL 2.1
@@ -537,7 +538,7 @@ int VSIIsCaseSensitiveFS( const char * pszFilename )
  * Analog of the POSIX fopen() function.
  *
  * @param pszFilename the file to open.  UTF-8 encoded.
- * @param pszAccess access requested (i.e. "r", "r+", "w".
+ * @param pszAccess access requested (i.e. "r", "r+", "w")
  *
  * @return NULL on failure, or the file handle.
  */
@@ -545,13 +546,62 @@ int VSIIsCaseSensitiveFS( const char * pszFilename )
 VSILFILE *VSIFOpenL( const char * pszFilename, const char * pszAccess )
 
 {
+    return VSIFOpenExL(pszFilename, pszAccess, false);
+}
+
+/************************************************************************/
+/*                               Open()                                 */
+/************************************************************************/
+
+VSIVirtualHandle *VSIFilesystemHandler::Open( const char *pszFilename,
+                                          const char *pszAccess )
+{
+    return Open(pszFilename, pszAccess, false);
+}
+
+/************************************************************************/
+/*                             VSIFOpenExL()                              */
+/************************************************************************/
+
+/**
+ * \brief Open file.
+ *
+ * This function opens a file with the desired access.  Large files (larger
+ * than 2GB) should be supported.  Binary access is always implied and
+ * the "b" does not need to be included in the pszAccess string.
+ *
+ * Note that the "VSILFILE *" returned by this function is
+ * *NOT* a standard C library FILE *, and cannot be used with any functions
+ * other than the "VSI*L" family of functions.  They aren't "real" FILE objects.
+ *
+ * On windows it is possible to define the configuration option
+ * GDAL_FILE_IS_UTF8 to have pszFilename treated as being in the local
+ * encoding instead of UTF-8, restoring the pre-1.8.0 behavior of VSIFOpenL().
+ *
+ * This method goes through the VSIFileHandler virtualization and may
+ * work on unusual filesystems such as in memory.
+ *
+ * Analog of the POSIX fopen() function.
+ *
+ * @param pszFilename the file to open.  UTF-8 encoded.
+ * @param pszAccess access requested (i.e. "r", "r+", "w")
+ * @param bSetError flag determining whether or not this open call should set VSIErrors on failure.
+ *
+ * @return NULL on failure, or the file handle.
+ *
+ * @since GDAL 2.1
+ */
+
+VSILFILE *VSIFOpenExL( const char * pszFilename, const char * pszAccess, int bSetError )
+
+{
     VSIFilesystemHandler *poFSHandler =
         VSIFileManager::GetHandler( pszFilename );
 
     VSILFILE* fp = reinterpret_cast<VSILFILE *>(
-        poFSHandler->Open( pszFilename, pszAccess ) );
+        poFSHandler->Open( pszFilename, pszAccess, CPL_TO_BOOL(bSetError) ) );
 
-    VSIDebug3( "VSIFOpenL(%s,%s) = %p", pszFilename, pszAccess, fp );
+    VSIDebug4( "VSIFOpenExL(%s,%s,%d) = %p", pszFilename, pszAccess, bSetError, fp );
 
     return fp;
 }

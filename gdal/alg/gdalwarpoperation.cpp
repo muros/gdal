@@ -1271,7 +1271,7 @@ CPLErr GDALWarpOperation::WarpRegion( int nDstXOff, int nDstYOff,
 /*      Allocate the output buffer.                                     */
 /* -------------------------------------------------------------------- */
     void *pDstBuffer;
-    int  nWordSize = GDALGetDataTypeSize(psOptions->eWorkingDataType)/8;
+    const int nWordSize = GDALGetDataTypeSizeBytes(psOptions->eWorkingDataType);
     int  nBandSize = nWordSize * nDstXSize * nDstYSize;
 
     if (nDstXSize > INT_MAX / nDstYSize ||
@@ -1505,7 +1505,7 @@ CPLErr GDALWarpOperation::WarpRegionToBuffer(
 {
     CPLErr eErr = CE_None;
     int    i;
-    int    nWordSize = GDALGetDataTypeSize(psOptions->eWorkingDataType)/8;
+    const int nWordSize = GDALGetDataTypeSizeBytes(psOptions->eWorkingDataType);
 
     (void) eBufDataType;
     CPLAssert( eBufDataType == psOptions->eWorkingDataType );
@@ -2056,21 +2056,31 @@ CPLErr GDALWarpOperation::CreateKernelMask( GDALWarpKernel *poKernel,
 /* -------------------------------------------------------------------- */
     if( *ppMask == NULL )
     {
-        int nBytes;
+        GIntBig nBytes;
 
         if( nBitsPerPixel == 32 )
-            nBytes = (nXSize * nYSize + nExtraElts) * 4;
+            nBytes = (static_cast<GIntBig>(nXSize) * nYSize + nExtraElts) * 4;
         else
-            nBytes = (nXSize * nYSize + nExtraElts + 31) / 8;
+            nBytes = (static_cast<GIntBig>(nXSize) * nYSize + nExtraElts + 31) / 8;
 
-        *ppMask = VSI_MALLOC_VERBOSE( nBytes );
+        const size_t nByteSize_t = static_cast<size_t>(nBytes);
+#if SIZEOF_VOIDP != 8
+        if( static_cast<GIntBig>(nByteSize_t) != nBytes )
+        {
+            CPLError( CE_Failure, CPLE_OutOfMemory, "Cannot allocate " CPL_FRMT_GIB " bytes",
+                      nBytes );
+            return CE_Failure;
+        }
+#endif
+
+        *ppMask = VSI_MALLOC_VERBOSE( nByteSize_t );
 
         if( *ppMask == NULL )
         {
             return CE_Failure;
         }
 
-        memset( *ppMask, nDefault, nBytes );
+        memset( *ppMask, nDefault, nByteSize_t );
     }
 
     return CE_None;

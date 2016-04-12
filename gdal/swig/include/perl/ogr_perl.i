@@ -123,6 +123,7 @@ package Geo::OGR;
 our $VERSION = '2.0100'; # this needs to be the same as that in gdal_perl.i
 
 sub Driver {
+    return 'Geo::GDAL::Driver' unless @_;
     bless Geo::GDAL::Driver(@_), 'Geo::OGR::Driver';
 }
 *GetDriver = *Driver;
@@ -130,7 +131,7 @@ sub Driver {
 sub GetDriverNames {
     my @names;
     for my $i (0..Geo::GDAL::GetDriverCount()-1) {
-        my $driver = Geo::GDAL::_GetDriver($i);
+        my $driver = Geo::GDAL::GetDriver($i);
         push @names, $driver->Name if $driver->TestCapability('VECTOR');
     }
     return @names;
@@ -140,7 +141,7 @@ sub GetDriverNames {
 sub Drivers {
     my @drivers;
     for my $i (0..GetDriverCount()-1) {
-        my $driver = Geo::GDAL::_GetDriver($i);
+        my $driver = Geo::GDAL::GetDriver($i);
         push @drivers, $driver if $driver->TestCapability('VECTOR');
     }
     return @drivers;
@@ -297,9 +298,11 @@ sub CreateField {
         if (exists $Geo::OGR::FieldDefn::TYPE_STRING2INT{$params{Type}}) {
             my $fd = Geo::OGR::FieldDefn->new(%params);
             _CreateField($self, $fd, $a);
-        } else {
+        } elsif (exists $Geo::OGR::Geometry::TYPE_STRING2INT{$params{Type}}) {
             my $fd = Geo::OGR::GeomFieldDefn->new(%params);
             CreateGeomField($self, $fd, $a);
+        } else {
+            Geo::GDAL::error("Invalid field type: $params{Type}.")
         }
     }
 }
@@ -307,11 +310,7 @@ sub CreateField {
 sub AlterFieldDefn {
     my $self = shift;
     my $field = shift;
-    my $index;
-    eval {
-        $index = $self->GetFieldIndex($field);
-    };
-    Geo::GDAL::error(2, $field, 'Non-spatial field') if $@;
+    my $index = $self->GetLayerDefn->GetFieldIndex($field);
     if (blessed($_[0]) and $_[0]->isa('Geo::OGR::FieldDefn')) {
         _AlterFieldDefn($self, $index, @_);
     } else {
@@ -328,14 +327,9 @@ sub AlterFieldDefn {
 }
 
 sub DeleteField {
-    my($self, $fn) = @_;
-    my $d = $self->GetDefn;
-    my $index = $d->GetFieldIndex($fn);
-    $index = $fn if $index < 0;
-    eval {
-        _DeleteField($self, $index);
-    };
-    Geo::GDAL::error(2, $fn, 'Non-spatial field') if $@;
+    my($self, $field) = @_;
+    my $index = $self->GetLayerDefn->GetFieldIndex($field);
+    _DeleteField($self, $index);
 }
 
 sub GetSchema {
@@ -478,8 +472,9 @@ sub GetFieldDefn {
 
 sub GeometryType {
     my $self = shift;
-    my $d = $self->GetDefn;
-    my $fd = $d->GetGeomFieldDefn(0);
+    my $field = shift;
+    $field //= 0;
+    my $fd = $self->GetDefn->GetGeomFieldDefn($field);
     return $fd->Type if $fd;
 }
 
@@ -539,10 +534,10 @@ sub new {
     my $self = Geo::OGRc::new_FeatureDefn($schema{Name});
     bless $self, $pkg;
     my $gt = $schema{GeometryType};
-    if ($fields) {
-        $self->DeleteGeomFieldDefn(0); # either default behavior or argument specified
-    } else {
-        $self->GeometryType($schema{GeometryType}) if exists $schema{GeometryType};
+    if ($gt) {
+        $self->GeometryType($gt);
+    } elsif ($fields) {
+        $self->DeleteGeomFieldDefn(0);
     }
     $self->StyleIgnored($schema{StyleIgnored}) if exists $schema{StyleIgnored};
     for my $fd (@{$fields}) {
@@ -557,6 +552,7 @@ sub new {
         if (blessed($d) and $d->isa('Geo::OGR::FieldDefn')) {
             AddFieldDefn($self, $d);
         } elsif (blessed($d) and $d->isa('Geo::OGR::GeomFieldDefn')) {
+            Geo::GDAL::error("Do not mix GeometryType and geometry fields in Fields.") if $gt;
             AddGeomFieldDefn($self, $d);
         } else {
             Geo::GDAL::error("Item in field list does not define a field.");
@@ -720,19 +716,22 @@ sub Layer {
 sub FETCH {
     my($self, $index) = @_;
     my $i;
-    eval {$i = $self->_GetFieldIndex($index)};
+    eval {$i = $self->GetFieldIndex($index)};
     return $self->GetField($i) unless $@;
-    Geo::GDAL::error("It is not safe to retrieve geometries from a feature this way.");
+    Geo::GDAL::error("'$index' is not a non-spatial field and it is not safe to retrieve geometries from a feature this way.");
 }
 
 sub STORE {
     my $self = shift;
     my $index = shift;
     my $i;
-    eval {$i = $self->_GetFieldIndex($index)};
-    $self->SetField($i, @_) unless $@;
-    $i = $self->_GetGeomFieldIndex($index);
-    $self->Geometry($i, @_);
+    eval {$i = $self->GetFieldIndex($index)};
+    unless ($@) {
+      $self->SetField($i, @_);
+    } else {
+      $i = $self->GetGeomFieldIndex($index);
+      $self->Geometry($i, @_);
+    }
 }
 
 sub FID {
@@ -867,21 +866,8 @@ sub GetDefn {
 *GetFieldNames = *Geo::OGR::Layer::GetFieldNames;
 *GetFieldDefn = *Geo::OGR::Layer::GetFieldDefn;
 
-sub _GetFieldIndex {
-    my($self, $field) = @_;
-    if ($field =~ /^\d+$/) {
-        return $field if $field >= 0 and $field < $self->GetFieldCount;
-    } else {
-        for my $i (0..$self->GetFieldCount-1) {
-            return $i if $self->GetFieldDefnRef($i)->Name eq $field;
-        }
-    }
-    Geo::GDAL::error(2, $field, 'Field');
-}
-
 sub GetField {
     my($self, $field) = @_;
-    $field = $self->_GetFieldIndex($field);
     return unless IsFieldSet($self, $field);
     my $type = GetFieldType($self, $field);
     if ($type == $Geo::OGR::OFTInteger) {
@@ -913,7 +899,7 @@ sub GetField {
         return wantarray ? @$ret : $ret;
     }
     if ($type == $Geo::OGR::OFTBinary) {
-        return GetFieldAsString($self, $field);
+        return GetFieldAsBinary($self, $field);
     }
     if ($type == $Geo::OGR::OFTDate) {
         my @ret = GetFieldAsDateTime($self, $field);
@@ -925,29 +911,28 @@ sub GetField {
         return wantarray ? @ret[3..6] : [@ret[3..6]];
     }
     if ($type == $Geo::OGR::OFTDateTime) {
-        return GetFieldAsDateTime($self, $field);
+        my @ret = GetFieldAsDateTime($self, $field);
+        return wantarray ? @ret : [@ret];
     }
     Geo::GDAL::error("Perl bindings do not support field type '$Geo::OGR::FieldDefn::TYPE_INT2STRING{$type}'.");
 }
 
 sub UnsetField {
     my($self, $field) = @_;
-    $field = $self->_GetFieldIndex($field);
     _UnsetField($self, $field);
 }
 
 sub SetField {
     my $self = shift;
     my $field = shift;
-    $field = $self->_GetFieldIndex($field);
     my $arg = $_[0];
     if (@_ == 0 or !defined($arg)) {
         _UnsetField($self, $field);
         return;
     }
     $arg = [@_] if @_ > 1;
+    my $type = $self->GetFieldType($field);
     if (ref($arg)) {
-        my $type = $self->GetFieldType($field);
         if ($type == $Geo::OGR::OFTIntegerList) {
             SetFieldIntegerList($self, $field, $arg);
         }
@@ -961,11 +946,7 @@ sub SetField {
             SetFieldStringList($self, $field, $arg);
         }
         elsif ($type == $Geo::OGR::OFTDate) {
-            # year, month, day, hour, minute, second, timezone
-            for my $i (0..6) {
-                $arg->[$i] //= 0;
-            }
-            _SetField($self, $field, @$arg[0..6]);
+            _SetField($self, $field, @$arg[0..2], 0, 0, 0, 0);
         }
         elsif ($type == $Geo::OGR::OFTTime) {
             $arg->[3] //= 0;
@@ -979,7 +960,12 @@ sub SetField {
             _SetField($self, $field, @$arg);
         }
     } else {
-        _SetField($self, $field, $arg);
+        if ($type == $Geo::OGR::OFTBinary) {
+            #$arg = unpack('H*', $arg); # remove when SetFieldBinary is available
+            $self->SetFieldBinary($field, $arg);
+        } else {
+            _SetField($self, $field, $arg);
+        }
     }
 }
 
@@ -990,33 +976,17 @@ sub Field {
     $self->GetField($field) if defined wantarray;
 }
 
-sub _GetGeomFieldIndex {
-    my($self, $field) = @_;
-    if (not defined $field) {
-        return 0 if $self->GetGeomFieldCount > 0;
-    } if ($field =~ /^\d+$/) {
-        return $field if $field >= 0 and $field < $self->GetGeomFieldCount;
-    } else {
-        for my $i (0..$self->GetGeomFieldCount-1) {
-            return $i if $self->GetGeomFieldDefn($i)->Name eq $field;
-        }
-        return 0 if $self->GetGeomFieldCount > 0 and $field eq 'Geometry';
-    }
-    Geo::GDAL::error(2, $field, 'Field');
-}
-
 sub Geometry {
     my $self = shift;
-    my $field = (ref($_[0]) eq '' or (@_ > 2 and @_ % 2 == 1)) ? shift : undef;
-    $field = $self->_GetGeomFieldIndex($field);
-    if (@_) {
+    my $field = ((@_ > 0 and ref($_[0]) eq '') or (@_ > 2 and @_ % 2 == 1)) ? shift : 0;
+    my $geometry;
+    if (@_ and @_ % 2 == 0) {
+        %$geometry = @_;
+    } else {
+        $geometry = shift;
+    }
+    if ($geometry) {
         my $type = $self->GetDefn->GetGeomFieldDefn($field)->Type;
-        my $geometry;
-        if (@_ == 1) {
-            $geometry = $_[0];
-        } elsif (@_ and @_ % 2 == 0) {
-            %$geometry = @_;
-        }
         if (blessed($geometry) and $geometry->isa('Geo::OGR::Geometry')) {
             my $gtype = $geometry->GeometryType;
             Geo::GDAL::error("The type of the inserted geometry ('$gtype') is not the same as the type of the field ('$type').")
@@ -1038,11 +1008,11 @@ sub Geometry {
             };
             confess Geo::GDAL->last_error if $@;
         } else {
-            Geo::GDAL::error("'@_' does not define a geometry.");
+            Geo::GDAL::error("Usage: \$feature->Geometry([field],[geometry])");
         }
     }
     return unless defined wantarray;
-    my $geometry = $self->GetGeomFieldRef($field);
+    $geometry = $self->GetGeomFieldRef($field);
     return unless $geometry;
     $GEOMETRIES{tied(%$geometry)} = $self;
     return $geometry;

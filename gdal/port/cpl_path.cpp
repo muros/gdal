@@ -61,7 +61,7 @@ static const char* CPLStaticBufferTooSmall(char *pszStaticResult)
 static char *CPLGetStaticResult()
 
 {
-    int bMemoryError;
+    int bMemoryError = FALSE;
     char *pachBufRingInfo
         = static_cast<char *>( CPLGetTLSEx( CTLS_PATHBUF, &bMemoryError ) );
     if( bMemoryError )
@@ -1070,9 +1070,9 @@ const char *CPLGenerateTempFilename( const char *pszStem )
 
     static int nTempFileCounter = 0;
     CPLString osFilename;
-    osFilename.Printf( "%s" CPL_FRMT_GIB "_%d",
+    osFilename.Printf( "%s_%d_%d",
                        pszStem,
-                       CPLGetPID(),
+                       CPLGetCurrentProcessID(),
                        CPLAtomicInc( &nTempFileCounter ) );
 
     return CPLFormFilename( pszDir, osFilename, NULL );

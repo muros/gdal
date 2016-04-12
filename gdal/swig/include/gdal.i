@@ -58,6 +58,7 @@ using namespace std;
 #include "cpl_string.h"
 #include "cpl_multiproc.h"
 #include "cpl_http.h"
+#include "cpl_vsi_error.h"
 
 #include "gdal.h"
 #include "gdal_priv.h"
@@ -746,6 +747,13 @@ GDALDriverShadow* GetDriverByName( char const *name ) {
 }
 %}
 
+#ifdef SWIGPERL
+%inline %{
+GDALDriverShadow* GetDriver( char const *name ) {
+  return (GDALDriverShadow*) GDALGetDriverByName( name );
+}
+%}
+#endif
 %inline %{
 GDALDriverShadow* GetDriver( int i ) {
   return (GDALDriverShadow*) GDALGetDriver( i );

@@ -1279,9 +1279,6 @@ OGRFeature *OGRDXFLayer::TranslateELLIPSE()
     double dfPrimaryRadius, dfSecondaryRadius;
     double dfRotation;
 
-    if( dfStartAngle > dfEndAngle )
-        dfEndAngle += 360.0;
-
     dfPrimaryRadius = sqrt( dfAxisX * dfAxisX
                             + dfAxisY * dfAxisY
                             + dfAxisZ * dfAxisZ );
@@ -1293,6 +1290,29 @@ OGRFeature *OGRDXFLayer::TranslateELLIPSE()
 /* -------------------------------------------------------------------- */
 /*      Create geometry                                                 */
 /* -------------------------------------------------------------------- */
+    if( oStyleProperties.count("210_N.dX") != 0
+        && oStyleProperties.count("220_N.dY") != 0
+        && oStyleProperties.count("230_N.dZ") != 0 )
+    {
+	    double adfN[3];
+
+	    adfN[0] = CPLAtof(oStyleProperties["210_N.dX"]);
+	    adfN[1] = CPLAtof(oStyleProperties["220_N.dY"]);
+	    adfN[2] = CPLAtof(oStyleProperties["230_N.dZ"]);
+
+            if( adfN[0] == 0.0 && adfN[1] == 0.0 && adfN[2] == -1.0 )
+            {
+                // reverse angles
+		double temp = dfEndAngle;
+
+		dfEndAngle = 360.0 - dfStartAngle;
+		dfStartAngle = 360.0 - temp;
+            }
+    }
+
+    if( dfStartAngle > dfEndAngle )
+        dfEndAngle += 360.0;
+
     OGRGeometry *poEllipse =
         OGRGeometryFactory::approximateArcAngles( dfX1, dfY1, dfZ1,
                                                   dfPrimaryRadius,
@@ -1304,7 +1324,8 @@ OGRFeature *OGRDXFLayer::TranslateELLIPSE()
     if( !bHaveZ )
         poEllipse->flattenTo2D();
 
-    ApplyOCSTransformer( poEllipse );
+    // disabled for ellipse entity
+    //ApplyOCSTransformer( poEllipse );
     poFeature->SetGeometryDirectly( poEllipse );
 
     PrepareLineStyle( poFeature );
@@ -1401,18 +1422,24 @@ OGRFeature *OGRDXFLayer::TranslateARC()
 /*                          TranslateSPLINE()                           */
 /************************************************************************/
 
-void rbspline(int npts,int k,int p1,double b[],double h[], double p[]);
-void rbsplinu(int npts,int k,int p1,double b[],double h[], double p[]);
+void rbspline2(int npts,int k,int p1,double b[],double h[],
+        bool xflag, double x[], double p[]);
 
 OGRFeature *OGRDXFLayer::TranslateSPLINE()
 
 {
     char szLineBuf[257];
-    int nCode, nDegree = -1, bClosed = FALSE, i;
+    int nCode, nDegree = -1, nOrder = -1, i;
+    int nControlPoints = -1, nKnots = -1;
+    bool bResult = false, bCalculateKnots = false;
     OGRFeature *poFeature = new OGRFeature( poFeatureDefn );
     std::vector<double> adfControlPoints;
+    std::vector<double> adfKnots;
+    std::vector<double> adfWeights;
 
     adfControlPoints.push_back(0.0);
+    adfKnots.push_back(0.0);
+    adfWeights.push_back(0.0);
 
 /* -------------------------------------------------------------------- */
 /*      Process values.                                                 */
@@ -1430,16 +1457,27 @@ OGRFeature *OGRDXFLayer::TranslateSPLINE()
             adfControlPoints.push_back( 0.0 );
             break;
 
-          case 70:
-          {
-            int l_nFlags = atoi(szLineBuf);
-            if( l_nFlags & 1 )
-                bClosed = TRUE;
+          case 40:
+            adfKnots.push_back( CPLAtof(szLineBuf) );
             break;
-          }
+
+          case 41:
+            adfWeights.push_back( CPLAtof(szLineBuf) );
+            break;
+
+          case 70:
+            break;
 
           case 71:
             nDegree = atoi(szLineBuf);
+            break;
+
+          case 72:
+            nKnots = atoi(szLineBuf);
+            break;
+
+          case 73:
+            nControlPoints = atoi(szLineBuf);
             break;
 
           default:
@@ -1457,40 +1495,86 @@ OGRFeature *OGRDXFLayer::TranslateSPLINE()
     if( nCode == 0 )
         poDS->UnreadValue();
 
-    if( bClosed )
+/* -------------------------------------------------------------------- */
+/*      Sanity checks                                                   */
+/* -------------------------------------------------------------------- */
+    nOrder = nDegree + 1;
+
+    bResult = ( nOrder >= 2 );
+    if( bResult == true )
     {
-        for( i = 0; i < nDegree; i++ )
+        // Check whether nctrlpts value matches number of vertices read
+        int nCheck = (static_cast<int>(adfControlPoints.size()) - 1) / 3;
+
+        if( nControlPoints == -1 )
+            nControlPoints =
+                (static_cast<int>(adfControlPoints.size()) - 1) / 3;
+
+        // min( num(ctrlpts) ) = order
+        bResult = ( nControlPoints >= nOrder && nControlPoints == nCheck);
+    }
+
+    if( bResult == true )
+    {
+        int nCheck = static_cast<int>(adfKnots.size()) - 1;
+
+        // Recalculate knots when:
+        // - no knots data present, nknots is -1 and ncheck is 0
+        // - nknots value present, no knot vertices
+        //   nknots is (nctrlpts + order), ncheck is 0
+        if( nCheck == 0 )
         {
-            adfControlPoints.push_back( adfControlPoints[i*3+1] );
-            adfControlPoints.push_back( adfControlPoints[i*3+2] );
-            adfControlPoints.push_back( adfControlPoints[i*3+3] );
+            bCalculateKnots = true;
+            for( i = 0; i < (nControlPoints + nOrder); i++ )
+                adfKnots.push_back( 0.0 );
+
+            nCheck = static_cast<int>(adfKnots.size()) - 1;
         }
+        // Adjust nknots value when:
+        // - nknots value not present, knot vertices present
+        //   nknots is -1, ncheck is (nctrlpts + order)
+        if( nKnots == -1 )
+            nKnots = static_cast<int>(adfKnots.size()) - 1;
+
+        // num(knots) = num(ctrlpts) + order
+        bResult = ( nKnots == (nControlPoints + nOrder) && nKnots == nCheck );
+    }
+
+    if( bResult == true )
+    {
+        int nWeights = static_cast<int>(adfWeights.size()) - 1;
+
+        if( nWeights == 0 )
+        {
+            for( i = 0; i < nControlPoints; i++ )
+                adfWeights.push_back( 1.0 );
+
+            nWeights = static_cast<int>(adfWeights.size()) - 1;
+        }
+
+        // num(weights) = num(ctrlpts)
+        bResult = ( nWeights == nControlPoints );
+    }
+
+    if( bResult == false )
+    {
+        DXF_LAYER_READER_ERROR();
+        delete poFeature;
+        return NULL;
     }
 
 /* -------------------------------------------------------------------- */
 /*      Interpolate spline                                              */
 /* -------------------------------------------------------------------- */
-    int nControlPoints = static_cast<int>(adfControlPoints.size()) / 3;
-    std::vector<double> h, p;
-
-    h.push_back(1.0);
-    for( i = 0; i < nControlPoints; i++ )
-        h.push_back( 1.0 );
-
-    // resolution:
-    //int p1 = getGraphicVariableInt("$SPLINESEGS", 8) * npts;
     int p1 = nControlPoints * 8;
+    std::vector<double> p;
 
     p.push_back( 0.0 );
     for( i = 0; i < 3*p1; i++ )
         p.push_back( 0.0 );
 
-    if( bClosed )
-        rbsplinu( nControlPoints, nDegree+1, p1, &(adfControlPoints[0]),
-                  &(h[0]), &(p[0]) );
-    else
-        rbspline( nControlPoints, nDegree+1, p1, &(adfControlPoints[0]),
-                  &(h[0]), &(p[0]) );
+    rbspline2( nControlPoints, nOrder, p1, &(adfControlPoints[0]),
+            &(adfWeights[0]), bCalculateKnots, &(adfKnots[0]), &(p[0]) );
 
 /* -------------------------------------------------------------------- */
 /*      Turn into OGR geometry.                                         */

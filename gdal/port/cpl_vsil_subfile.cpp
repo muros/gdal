@@ -76,8 +76,11 @@ public:
                                     vsi_l_offset &nSubFileOffset,
                                     vsi_l_offset &nSubFileSize );
 
+    using VSIFilesystemHandler::Open;
+
     virtual VSIVirtualHandle *Open( const char *pszFilename,
-                                    const char *pszAccess);
+                                    const char *pszAccess,
+                                    bool bSetError );
     virtual int      Stat( const char *pszFilename, VSIStatBufL *pStatBuf, int nFlags );
     virtual int      Unlink( const char *pszFilename );
     virtual int      Mkdir( const char *pszDirname, long nMode );
@@ -301,7 +304,8 @@ VSISubFileFilesystemHandler::DecomposePath( const char *pszPath,
 
 VSIVirtualHandle *
 VSISubFileFilesystemHandler::Open( const char *pszFilename,
-                                   const char *pszAccess )
+                                   const char *pszAccess,
+                                   bool /* bSetError */ )
 
 {
     CPLString osSubFilePath;

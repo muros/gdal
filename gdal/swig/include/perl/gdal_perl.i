@@ -65,8 +65,6 @@ ALTERED_DESTROY(GDALRasterAttributeTableShadow, GDALc, delete_RasterAttributeTab
 
 %rename (_FindFile) FindFile;
 
-%rename (_GetDriver) GetDriver;
-
 %rename (_Open) Open;
 %newobject _Open;
 
@@ -430,7 +428,7 @@ sub PackCharacter {
 sub GetDriverNames {
     my @names;
     for my $i (0..GetDriverCount()-1) {
-        my $driver = _GetDriver($i);
+        my $driver = GetDriver($i);
         push @names, $driver->Name if $driver->TestCapability('RASTER');
     }
     return @names;
@@ -440,23 +438,16 @@ sub GetDriverNames {
 sub Drivers {
     my @drivers;
     for my $i (0..GetDriverCount()-1) {
-        my $driver = _GetDriver($i);
+        my $driver = GetDriver($i);
         push @drivers, $driver if $driver->TestCapability('RASTER');
     }
     return @drivers;
 }
 
-sub GetDriver {
-    my($name) = @_;
-    $name //= 0;
-    my $driver;
-    $driver = _GetDriver($name) if $name =~ /^\d+$/; # is the name an index to driver list?
-    $driver //= GetDriverByName("$name");
-    Geo::GDAL::error(2, $name, 'Driver') unless $driver;
-    return $driver;
-
+sub Driver {
+    return 'Geo::GDAL::Driver' unless @_;
+    return GetDriver(@_);
 }
-*Driver = *GetDriver;
 
 sub AccessTypes {
     return qw/ReadOnly Update/;
@@ -758,7 +749,6 @@ sub Dataset {
 sub Domains {
     return @DOMAINS;
 }
-*GetDriver = *_GetDriver;
 
 *Open = *Geo::GDAL::Open;
 *OpenShared = *Geo::GDAL::OpenShared;
@@ -854,14 +844,19 @@ sub CreateLayer {
         $p->{fields} = $s->{Fields} if exists $s->{Fields};
         $p->{name} = $s->{Name} if exists $s->{Name};
     }
-    $p->{geometrytype} //= 'None' if $p->{fields};
+    $p->{fields} = [] unless ref($p->{fields}) eq 'ARRAY';
+    # if fields contains spatial fields, then do not create default one
+    for my $f (@{$p->{fields}}) {
+        if ($f->{GeometryType} or exists $Geo::OGR::Geometry::TYPE_STRING2INT{$f->{Type}}) {
+            $p->{geometrytype} = 'None';
+            last;
+        }
+    }
     my $gt = Geo::GDAL::string2int($p->{geometrytype}, \%Geo::OGR::Geometry::TYPE_STRING2INT);
     my $layer = _CreateLayer($self, $p->{name}, $p->{srs}, $gt, $p->{options});
     $LAYERS{tied(%$layer)} = $self;
-    if ($p->{fields}) {
-        for my $field (@{$p->{fields}}) {
-            $layer->CreateField($field);
-        }
+    for my $f (@{$p->{fields}}) {
+        $layer->CreateField($f);
     }
     return $layer;
 }

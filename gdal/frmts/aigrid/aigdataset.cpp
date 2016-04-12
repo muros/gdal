@@ -46,7 +46,7 @@ static CPLString OSR_GDS( char **papszNV, const char * pszField,
 
 /************************************************************************/
 /* ==================================================================== */
-/*				AIGDataset				*/
+/*                              AIGDataset                              */
 /* ==================================================================== */
 /************************************************************************/
 
@@ -56,10 +56,10 @@ class CPL_DLL AIGDataset : public GDALPamDataset
 {
     friend class AIGRasterBand;
 
-    AIGInfo_t	*psInfo;
+    AIGInfo_t   *psInfo;
 
-    char	**papszPrj;
-    char	*pszProjection;
+    char        **papszPrj;
+    char        *pszProjection;
 
     GDALColorTable *poCT;
     int         bHasReadRat;
@@ -146,8 +146,8 @@ CPLErr AIGRasterBand::IReadBlock( int nBlockXOff, int nBlockYOff,
                                   void * pImage )
 
 {
-    AIGDataset	*poODS = (AIGDataset *) poDS;
-    GInt32	*panGridRaster;
+    AIGDataset *poODS = (AIGDataset *) poDS;
+    GInt32 *panGridRaster;
 
     if( poODS->psInfo->nCellType == AIG_CELLTYPE_INT )
     {
@@ -204,7 +204,7 @@ CPLErr AIGRasterBand::IReadBlock( int nBlockXOff, int nBlockYOff,
 GDALRasterAttributeTable *AIGRasterBand::GetDefaultRAT()
 
 {
-    AIGDataset	*poODS = (AIGDataset *) poDS;
+    AIGDataset *poODS = (AIGDataset *) poDS;
 
 /* -------------------------------------------------------------------- */
 /*      Read info raster attribute table, if present.                   */
@@ -228,7 +228,7 @@ GDALRasterAttributeTable *AIGRasterBand::GetDefaultRAT()
 double AIGRasterBand::GetMinimum( int *pbSuccess )
 
 {
-    AIGDataset	*poODS = (AIGDataset *) poDS;
+    AIGDataset *poODS = (AIGDataset *) poDS;
 
     if( pbSuccess != NULL )
         *pbSuccess = TRUE;
@@ -243,7 +243,7 @@ double AIGRasterBand::GetMinimum( int *pbSuccess )
 double AIGRasterBand::GetMaximum( int *pbSuccess )
 
 {
-    AIGDataset	*poODS = (AIGDataset *) poDS;
+    AIGDataset *poODS = (AIGDataset *) poDS;
 
     if( pbSuccess != NULL )
         *pbSuccess = TRUE;
@@ -280,7 +280,7 @@ double AIGRasterBand::GetNoDataValue( int *pbSuccess )
 GDALColorInterp AIGRasterBand::GetColorInterpretation()
 
 {
-    AIGDataset	*poODS = (AIGDataset *) poDS;
+    AIGDataset *poODS = (AIGDataset *) poDS;
 
     if( poODS->poCT != NULL )
         return GCI_PaletteIndex;
@@ -295,7 +295,7 @@ GDALColorInterp AIGRasterBand::GetColorInterpretation()
 GDALColorTable *AIGRasterBand::GetColorTable()
 
 {
-    AIGDataset	*poODS = (AIGDataset *) poDS;
+    AIGDataset *poODS = (AIGDataset *) poDS;
 
     if( poODS->poCT != NULL )
         return poODS->poCT;
@@ -408,8 +408,6 @@ static void CPL_STDCALL AIGErrorHandlerVATOpen(CPLErr eErr, CPLErrorNum no, cons
 void AIGDataset::ReadRAT()
 
 {
-#ifndef OGR_ENABLED
-#else
 /* -------------------------------------------------------------------- */
 /*      Check if we have an associated info directory.  If not          */
 /*      return quietly.                                                 */
@@ -542,8 +540,6 @@ void AIGDataset::ReadRAT()
     /* Workaround against #2447 and #3031, to avoid binding languages */
     /* not being able to open the dataset */
     CPLErrorReset();
-
-#endif /* OGR_ENABLED */
 }
 
 /************************************************************************/
@@ -553,7 +549,7 @@ void AIGDataset::ReadRAT()
 GDALDataset *AIGDataset::Open( GDALOpenInfo * poOpenInfo )
 
 {
-    AIGInfo_t	*psInfo;
+    AIGInfo_t *psInfo;
 
 /* -------------------------------------------------------------------- */
 /*      If the pass name ends in .adf assume a file within the          */
@@ -676,7 +672,7 @@ GDALDataset *AIGDataset::Open( GDALOpenInfo * poOpenInfo )
 /* -------------------------------------------------------------------- */
 /*      Create a corresponding GDALDataset.                             */
 /* -------------------------------------------------------------------- */
-    AIGDataset 	*poDS = new AIGDataset();
+    AIGDataset *poDS = new AIGDataset();
 
     poDS->psInfo = psInfo;
 
@@ -709,8 +705,7 @@ GDALDataset *AIGDataset::Open( GDALOpenInfo * poOpenInfo )
                            CPLGetFilename( osCleanPath ) );
 
         if( VSIStatL( osTestName, &sStatBuf ) != 0 )
-
-	{
+        {
             osTestName.Printf( "%s/../%s.CLR",
                                psInfo->pszCoverName,
                                CPLGetFilename( osCleanPath ) );
@@ -738,13 +733,13 @@ GDALDataset *AIGDataset::Open( GDALOpenInfo * poOpenInfo )
     poDS->SetBand( 1, new AIGRasterBand( poDS, 1 ) );
 
 /* -------------------------------------------------------------------- */
-/*	Try to read projection file.					*/
+/*      Try to read projection file.                                    */
 /* -------------------------------------------------------------------- */
-    const char	*pszPrjFilename
+    const char *pszPrjFilename
         = CPLFormCIFilename( psInfo->pszCoverName, "prj", "adf" );
     if( VSIStatL( pszPrjFilename, &sStatBuf ) == 0 )
     {
-        OGRSpatialReference	oSRS;
+        OGRSpatialReference oSRS;
 
         poDS->papszPrj = CSLLoad( pszPrjFilename );
 

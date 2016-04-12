@@ -218,8 +218,6 @@ AC_CHECK_FUNC_CUSTOM(gmtime_r,[#include <time.h>],[time_t t; struct tm ltime; t 
 AC_CHECK_FUNC_CUSTOM(localtime_r,[#include <time.h>],[time_t t; struct tm ltime; t = time(0); localtime_r( &t, &ltime );])
 AC_LANG_POP(C++)
 
-AC_CHECK_FUNC(setlocale)
-
 AC_MSG_CHECKING([for uselocale])
 AC_TRY_COMPILE(
   [
@@ -2804,16 +2802,8 @@ AC_SUBST([OPT_GDAL_FORMATS], [$OPT_GDAL_FORMATS])
 
 dnl ---------------------------------------------------------------------------
 
-AC_ARG_WITH(ogr,[  --without-ogr         Don't build OGR into shared library],,)
-
-if test "$with_ogr" = yes -o x"$with_ogr" = x ; then
-  echo checking for OGR ... enabled
-  OGR_ENABLED=yes
-else
-  echo checking for OGR ... disabled by user
-  OGR_ENABLED=no
-fi
-AC_SUBST(OGR_ENABLED,$OGR_ENABLED)
+dnl Always build with OGR support.
+OGR_ENABLED=yes
 
 dnl ---------------------------------------------------------------------------
 
@@ -3300,14 +3290,18 @@ else
 
     elif test -f "$with_spatialite/include/spatialite.h" -a \
         "$SPATIALITE_INIT_FOUND" = "yes"; then
-        AC_CHECK_HEADERS(sqlite3.h)
-        if test "$ac_cv_header_sqlite3_h" = "yes"; then
-            AC_MSG_RESULT(enabled)
+
+        SQLITE3_REQ_VERSION="3.0.0"
+        AX_LIB_SQLITE3($SQLITE3_REQ_VERSION)
+
+        if test "$HAVE_SQLITE3" = "yes"; then
             SPATIALITE_INC="-I$with_spatialite/include"
             HAVE_SPATIALITE=yes
-            SPATIALITE_LIBS="-L$with_spatialite/lib -lspatialite -lsqlite3"
-            LIBS="$LIBS $SPATIALITE_LIBS"
-            HAVE_SQLITE3=yes
+            SPATIALITE_LIBS="-L$with_spatialite/lib -lspatialite"
+            LIBS="$SQLITE3_LDFLAGS $LIBS $SPATIALITE_LIBS"
+            AC_MSG_RESULT(spatialite enabled)
+        else
+            AC_MSG_RESULT(spatialite disabled)
         fi
     else
         AC_MSG_RESULT(disabled)
@@ -5126,7 +5120,6 @@ fi
 LOC_MSG([  SWIG Bindings:             ${WHAT_BINDINGS}])
 LOC_MSG()
 LOC_MSG([  Statically link PROJ.4:    ${PROJ_STATIC}])
-LOC_MSG([  enable OGR building:       ${OGR_ENABLED}])
 LOC_MSG([  enable GNM building:       ${GNM_ENABLED}])
 LOC_MSG([  enable pthread support:    ${PTHREAD_ENABLED}])
 LOC_MSG([  enable POSIX iconv support:${am_cv_func_iconv}])

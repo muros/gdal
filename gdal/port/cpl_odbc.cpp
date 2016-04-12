@@ -296,12 +296,11 @@ int CPLODBCSession::RollbackTransaction()
 
     if (m_bInTransaction)
     {
+        /* Rollback should not hide the previous error so Failed() is not called. */
+        int nRetCode = SQLEndTran( SQL_HANDLE_DBC, m_hDBC, SQL_ROLLBACK );
         m_bInTransaction = FALSE;
 
-        if( Failed( SQLEndTran( SQL_HANDLE_DBC, m_hDBC, SQL_ROLLBACK ) ) )
-        {
-            return FALSE;
-        }
+        return (nRetCode == SQL_SUCCESS || nRetCode == SQL_SUCCESS_WITH_INFO );
     }
 
 #endif
@@ -388,7 +387,7 @@ int CPLODBCSession::EstablishSession( const char *pszDSN,
     if( pszPassword == NULL )
         pszPassword = "";
 
-    int bFailed;
+    int bFailed = FALSE;
     if( strstr(pszDSN,"=") != NULL )
     {
         SQLCHAR szOutConnString[1024];
@@ -1289,16 +1288,20 @@ int CPLODBCStatement::Appendf( const char *pszFormat, ... )
 
 {
     va_list args;
-    char    szFormattedText[8000];
-    int     bSuccess;
 
     va_start( args, pszFormat );
+
+    char szFormattedText[8000];  // TODO: Move this off the stack.
+    szFormattedText[0] = '\0';
+
 #if defined(HAVE_VSNPRINTF)
-    bSuccess = vsnprintf( szFormattedText, sizeof(szFormattedText)-1,
-                          pszFormat, args ) < (int) sizeof(szFormattedText)-1;
+    const bool bSuccess =
+        vsnprintf( szFormattedText, sizeof(szFormattedText)-1,
+                   pszFormat, args )
+        < static_cast<int>( sizeof(szFormattedText) - 1 );
 #else
     vsprintf( szFormattedText, pszFormat, args );
-    bSuccess = TRUE;
+    const bool bSuccess = true;
 #endif
     va_end( args );
 
@@ -1633,15 +1636,13 @@ int CPLODBCStatement::GetTables( const char *pszCatalog,
 void CPLODBCStatement::DumpResult( FILE *fp, int bShowSchema )
 
 {
-    int iCol;
-
 /* -------------------------------------------------------------------- */
 /*      Display schema                                                  */
 /* -------------------------------------------------------------------- */
     if( bShowSchema )
     {
         fprintf( fp, "Column Definitions:\n" );
-        for( iCol = 0; iCol < GetColCount(); iCol++ )
+        for( int iCol = 0; iCol < GetColCount(); iCol++ )
         {
             fprintf( fp, " %2d: %-24s ", iCol, GetColName(iCol) );
             if( GetColPrecision(iCol) > 0
@@ -1668,7 +1669,7 @@ void CPLODBCStatement::DumpResult( FILE *fp, int bShowSchema )
     {
         fprintf( fp, "Record %d\n", iRecord++ );
 
-        for( iCol = 0; iCol < GetColCount(); iCol++ )
+        for( int iCol = 0; iCol < GetColCount(); iCol++ )
         {
             fprintf( fp, "  %s: %s\n", GetColName(iCol), GetColData(iCol) );
         }
@@ -1827,6 +1828,7 @@ SQLSMALLINT CPLODBCStatement::GetTypeMapping( SQLSMALLINT nTypeCode )
         case SQL_BINARY:
         case SQL_VARBINARY:
         case SQL_LONGVARBINARY:
+        case -151: /*SQL_SS_UDT*/
             return SQL_C_BINARY;
 
         default:

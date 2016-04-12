@@ -1224,6 +1224,14 @@ def GetLastErrorMsg(*args):
   """GetLastErrorMsg() -> char const *"""
   return _gdal.GetLastErrorMsg(*args)
 
+def VSIGetLastErrorNo(*args):
+  """VSIGetLastErrorNo() -> int"""
+  return _gdal.VSIGetLastErrorNo(*args)
+
+def VSIGetLastErrorMsg(*args):
+  """VSIGetLastErrorMsg() -> char const *"""
+  return _gdal.VSIGetLastErrorMsg(*args)
+
 def PushFinderLocation(*args):
   """PushFinderLocation(char const * utf8_path)"""
   return _gdal.PushFinderLocation(*args)
@@ -1325,6 +1333,10 @@ def VSIStatL(*args):
 def VSIFOpenL(*args):
   """VSIFOpenL(char const * utf8_path, char const * pszMode) -> VSILFILE *"""
   return _gdal.VSIFOpenL(*args)
+
+def VSIFOpenExL(*args):
+  """VSIFOpenExL(char const * utf8_path, char const * pszMode, int bSetError) -> VSILFILE *"""
+  return _gdal.VSIFOpenExL(*args)
 
 def VSIFCloseL(*args):
   """VSIFCloseL(VSILFILE * fp) -> VSI_RETVAL"""

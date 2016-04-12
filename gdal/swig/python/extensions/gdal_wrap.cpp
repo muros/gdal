@@ -3086,6 +3086,7 @@ using namespace std;
 #include "cpl_string.h"
 #include "cpl_multiproc.h"
 #include "cpl_http.h"
+#include "cpl_vsi_error.h"
 
 #include "gdal.h"
 #include "gdal_priv.h"
@@ -3693,7 +3694,7 @@ void CPL_STDCALL PyCPLErrorHandler(CPLErr eErrClass, int err_no, const char* psz
 
 retStringAndCPLFree* EscapeString(int len, char *bin_string , int scheme=CPLES_SQL) {
     return CPLEscapeString(bin_string, len, scheme);
-} 
+}
 
 
 SWIGINTERNINLINE PyObject *
@@ -3792,6 +3793,14 @@ VSILFILE   *wrapper_VSIFOpenL( const char *utf8_path, const char *pszMode )
     if (!pszMode) /* would lead to segfault */
         pszMode = "r";
     return VSIFOpenL( utf8_path, pszMode );
+}
+
+
+VSILFILE   *wrapper_VSIFOpenExL( const char *utf8_path, const char *pszMode, int bSetError )
+{
+    if (!pszMode) /* would lead to segfault */
+        pszMode = "r";
+    return VSIFOpenExL( utf8_path, pszMode, bSetError );
 }
 
 
@@ -6998,6 +7007,60 @@ fail:
 }
 
 
+SWIGINTERN PyObject *_wrap_VSIGetLastErrorNo(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0; int bLocalUseExceptionsCode = bUseExceptions;
+  int result;
+  
+  if (!PyArg_ParseTuple(args,(char *)":VSIGetLastErrorNo")) SWIG_fail;
+  {
+    if ( bUseExceptions ) {
+      CPLErrorReset();
+    }
+    result = (int)VSIGetLastErrorNo();
+#ifndef SED_HACKS
+    if ( bUseExceptions ) {
+      CPLErr eclass = CPLGetLastErrorType();
+      if ( eclass == CE_Failure || eclass == CE_Fatal ) {
+        SWIG_exception( SWIG_RuntimeError, CPLGetLastErrorMsg() );
+      }
+    }
+#endif
+  }
+  resultobj = SWIG_From_int(static_cast< int >(result));
+  if ( ReturnSame(bLocalUseExceptionsCode) ) { CPLErr eclass = CPLGetLastErrorType(); if ( eclass == CE_Failure || eclass == CE_Fatal ) { Py_XDECREF(resultobj); SWIG_Error( SWIG_RuntimeError, CPLGetLastErrorMsg() ); return NULL; } }
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_VSIGetLastErrorMsg(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0; int bLocalUseExceptionsCode = bUseExceptions;
+  char *result = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)":VSIGetLastErrorMsg")) SWIG_fail;
+  {
+    if ( bUseExceptions ) {
+      CPLErrorReset();
+    }
+    result = (char *)VSIGetLastErrorMsg();
+#ifndef SED_HACKS
+    if ( bUseExceptions ) {
+      CPLErr eclass = CPLGetLastErrorType();
+      if ( eclass == CE_Failure || eclass == CE_Fatal ) {
+        SWIG_exception( SWIG_RuntimeError, CPLGetLastErrorMsg() );
+      }
+    }
+#endif
+  }
+  resultobj = SWIG_FromCharPtr((const char *)result);
+  if ( ReturnSame(bLocalUseExceptionsCode) ) { CPLErr eclass = CPLGetLastErrorType(); if ( eclass == CE_Failure || eclass == CE_Fatal ) { Py_XDECREF(resultobj); SWIG_Error( SWIG_RuntimeError, CPLGetLastErrorMsg() ); return NULL; } }
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
 SWIGINTERN PyObject *_wrap_PushFinderLocation(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0; int bLocalUseExceptionsCode = bUseExceptions;
   char *arg1 = (char *) 0 ;
@@ -8250,6 +8313,79 @@ SWIGINTERN PyObject *_wrap_VSIFOpenL(PyObject *SWIGUNUSEDPARM(self), PyObject *a
       CPLErrorReset();
     }
     result = (VSILFILE *)wrapper_VSIFOpenL((char const *)arg1,(char const *)arg2);
+#ifndef SED_HACKS
+    if ( bUseExceptions ) {
+      CPLErr eclass = CPLGetLastErrorType();
+      if ( eclass == CE_Failure || eclass == CE_Fatal ) {
+        SWIG_exception( SWIG_RuntimeError, CPLGetLastErrorMsg() );
+      }
+    }
+#endif
+  }
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_void, 0 |  0 );
+  {
+    /* %typemap(freearg) (const char *utf8_path) */
+    GDALPythonFreeCStr(arg1, bToFree1);
+  }
+  if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  if ( ReturnSame(bLocalUseExceptionsCode) ) { CPLErr eclass = CPLGetLastErrorType(); if ( eclass == CE_Failure || eclass == CE_Fatal ) { Py_XDECREF(resultobj); SWIG_Error( SWIG_RuntimeError, CPLGetLastErrorMsg() ); return NULL; } }
+  return resultobj;
+fail:
+  {
+    /* %typemap(freearg) (const char *utf8_path) */
+    GDALPythonFreeCStr(arg1, bToFree1);
+  }
+  if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_VSIFOpenExL(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0; int bLocalUseExceptionsCode = bUseExceptions;
+  char *arg1 = (char *) 0 ;
+  char *arg2 = (char *) 0 ;
+  int arg3 ;
+  int bToFree1 = 0 ;
+  int res2 ;
+  char *buf2 = 0 ;
+  int alloc2 = 0 ;
+  int val3 ;
+  int ecode3 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  PyObject * obj2 = 0 ;
+  VSILFILE *result = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OOO:VSIFOpenExL",&obj0,&obj1,&obj2)) SWIG_fail;
+  {
+    /* %typemap(in) (const char *utf8_path) */
+    arg1 = GDALPythonObjectToCStr( obj0, &bToFree1 );
+    if (arg1 == NULL)
+    {
+      PyErr_SetString( PyExc_RuntimeError, "not a string" );
+      SWIG_fail;
+    }
+  }
+  res2 = SWIG_AsCharPtrAndSize(obj1, &buf2, NULL, &alloc2);
+  if (!SWIG_IsOK(res2)) {
+    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "VSIFOpenExL" "', argument " "2"" of type '" "char const *""'");
+  }
+  arg2 = reinterpret_cast< char * >(buf2);
+  ecode3 = SWIG_AsVal_int(obj2, &val3);
+  if (!SWIG_IsOK(ecode3)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "VSIFOpenExL" "', argument " "3"" of type '" "int""'");
+  } 
+  arg3 = static_cast< int >(val3);
+  {
+    if (!arg1) {
+      SWIG_exception(SWIG_ValueError,"Received a NULL pointer.");
+    }
+  }
+  {
+    if ( bUseExceptions ) {
+      CPLErrorReset();
+    }
+    result = (VSILFILE *)wrapper_VSIFOpenExL((char const *)arg1,(char const *)arg2,arg3);
 #ifndef SED_HACKS
     if ( bUseExceptions ) {
       CPLErr eclass = CPLGetLastErrorType();
@@ -29045,6 +29181,8 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"GetLastErrorNo", _wrap_GetLastErrorNo, METH_VARARGS, (char *)"GetLastErrorNo() -> int"},
 	 { (char *)"GetLastErrorType", _wrap_GetLastErrorType, METH_VARARGS, (char *)"GetLastErrorType() -> int"},
 	 { (char *)"GetLastErrorMsg", _wrap_GetLastErrorMsg, METH_VARARGS, (char *)"GetLastErrorMsg() -> char const *"},
+	 { (char *)"VSIGetLastErrorNo", _wrap_VSIGetLastErrorNo, METH_VARARGS, (char *)"VSIGetLastErrorNo() -> int"},
+	 { (char *)"VSIGetLastErrorMsg", _wrap_VSIGetLastErrorMsg, METH_VARARGS, (char *)"VSIGetLastErrorMsg() -> char const *"},
 	 { (char *)"PushFinderLocation", _wrap_PushFinderLocation, METH_VARARGS, (char *)"PushFinderLocation(char const * utf8_path)"},
 	 { (char *)"PopFinderLocation", _wrap_PopFinderLocation, METH_VARARGS, (char *)"PopFinderLocation()"},
 	 { (char *)"FinderClean", _wrap_FinderClean, METH_VARARGS, (char *)"FinderClean()"},
@@ -29070,6 +29208,7 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"StatBuf_swigregister", StatBuf_swigregister, METH_VARARGS, NULL},
 	 { (char *)"VSIStatL", _wrap_VSIStatL, METH_VARARGS, (char *)"VSIStatL(char const * utf8_path, int nFlags=0) -> int"},
 	 { (char *)"VSIFOpenL", _wrap_VSIFOpenL, METH_VARARGS, (char *)"VSIFOpenL(char const * utf8_path, char const * pszMode) -> VSILFILE *"},
+	 { (char *)"VSIFOpenExL", _wrap_VSIFOpenExL, METH_VARARGS, (char *)"VSIFOpenExL(char const * utf8_path, char const * pszMode, int bSetError) -> VSILFILE *"},
 	 { (char *)"VSIFCloseL", _wrap_VSIFCloseL, METH_VARARGS, (char *)"VSIFCloseL(VSILFILE * fp) -> VSI_RETVAL"},
 	 { (char *)"VSIFSeekL", _wrap_VSIFSeekL, METH_VARARGS, (char *)"VSIFSeekL(VSILFILE * fp, GIntBig offset, int whence) -> int"},
 	 { (char *)"VSIFTellL", _wrap_VSIFTellL, METH_VARARGS, (char *)"VSIFTellL(VSILFILE * fp) -> GIntBig"},
@@ -29573,7 +29712,7 @@ static swig_type_info _swigt__p_StatBuf = {"_p_StatBuf", "StatBuf *", 0, 0, (voi
 static swig_type_info _swigt__p_char = {"_p_char", "char *|retStringAndCPLFree *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_double = {"_p_double", "double *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_f_double_p_q_const__char_p_void__int = {"_p_f_double_p_q_const__char_p_void__int", "int (*)(double,char const *,void *)", 0, 0, (void*)0, 0};
-static swig_type_info _swigt__p_int = {"_p_int", "OGRFieldSubType *|GDALRATFieldType *|OGRFieldType *|RETURN_NONE *|int *|GDALAccess *|OGRwkbByteOrder *|CPLErr *|GDALRWFlag *|OGRJustification *|GDALRATFieldUsage *|GDALTileOrganization *|GDALPaletteInterp *|GDALColorInterp *|GDALResampleAlg *|GDALRIOResampleAlg *|OGRErr *|OGRwkbGeometryType *|GDALDataType *|GDALAsyncStatusType *", 0, 0, (void*)0, 0};
+static swig_type_info _swigt__p_int = {"_p_int", "OGRFieldSubType *|GDALRATFieldType *|OGRFieldType *|RETURN_NONE *|int *|GDALAccess *|OGRwkbByteOrder *|CPLErr *|GDALRWFlag *|OGRJustification *|GDALRATFieldUsage *|GDALTileOrganization *|OGRAxisOrientation *|GDALPaletteInterp *|GDALColorInterp *|GDALResampleAlg *|GDALRIOResampleAlg *|OGRErr *|OGRwkbGeometryType *|GDALDataType *|GDALAsyncStatusType *", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_p_GDALDatasetShadow = {"_p_p_GDALDatasetShadow", "GDALDatasetShadow **", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_p_GDALRasterBandShadow = {"_p_p_GDALRasterBandShadow", "GDALRasterBandShadow **", 0, 0, (void*)0, 0};
 static swig_type_info _swigt__p_p_GDAL_GCP = {"_p_p_GDAL_GCP", "GDAL_GCP **", 0, 0, (void*)0, 0};

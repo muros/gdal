@@ -3260,6 +3260,7 @@ class Feature(_object):
     def GetFieldAsDateTime(self, *args):
         """
         GetFieldAsDateTime(Feature self, int id)
+        GetFieldAsDateTime(Feature self, char const * name)
 
         int
         OGR_F_GetFieldAsDateTime(OGRFeatureH hFeat, int iField, int *pnYear,
@@ -3306,6 +3307,7 @@ class Feature(_object):
     def GetFieldAsIntegerList(self, *args):
         """
         GetFieldAsIntegerList(Feature self, int id)
+        GetFieldAsIntegerList(Feature self, char const * name)
 
         const int*
         OGR_F_GetFieldAsIntegerList(OGRFeatureH hFeat, int iField, int
@@ -3368,6 +3370,7 @@ class Feature(_object):
     def GetFieldAsDoubleList(self, *args):
         """
         GetFieldAsDoubleList(Feature self, int id)
+        GetFieldAsDoubleList(Feature self, char const * name)
 
         const double*
         OGR_F_GetFieldAsDoubleList(OGRFeatureH hFeat, int iField, int

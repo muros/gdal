@@ -197,10 +197,13 @@ public:
     VSIGZipFilesystemHandler();
     ~VSIGZipFilesystemHandler();
 
+    using VSIFilesystemHandler::Open;
+
     virtual VSIVirtualHandle *Open( const char *pszFilename,
-                                    const char *pszAccess);
+                                    const char *pszAccess,
+                                    bool bSetError );
     VSIGZipHandle *OpenGZipReadOnly( const char *pszFilename,
-                                     const char *pszAccess);
+                                     const char *pszAccess );
     virtual int      Stat( const char *pszFilename, VSIStatBufL *pStatBuf, int nFlags );
     virtual int      Unlink( const char *pszFilename );
     virtual int      Rename( const char *oldpath, const char *newpath );
@@ -468,7 +471,7 @@ void VSIGZipHandle::check_header()
         while (len-- != 0 && get_byte() != EOF) ;
     }
 
-    int c;
+    int c = 0;
     if ((flags & ORIG_NAME) != 0) { /* skip the original file name */
         while ((c = get_byte()) != 0 && c != EOF) ;
     }
@@ -1347,7 +1350,8 @@ void VSIGZipFilesystemHandler::SaveInfo_unlocked(  VSIGZipHandle* poHandle )
 /************************************************************************/
 
 VSIVirtualHandle* VSIGZipFilesystemHandler::Open( const char *pszFilename,
-                                                  const char *pszAccess)
+                                                  const char *pszAccess,
+                                                  bool /* bSetError */ )
 {
     VSIFilesystemHandler *poFSHandler =
         VSIFileManager::GetHandler( pszFilename + strlen("/vsigzip/"));
@@ -1521,9 +1525,8 @@ int VSIGZipFilesystemHandler::Stat( const char *pszFilename,
                 VSIGZipFilesystemHandler::OpenGZipReadOnly(pszFilename, "rb");
         if (poHandle)
         {
-            GUIntBig uncompressed_size;
             poHandle->Seek(0, SEEK_END);
-            uncompressed_size = (GUIntBig) poHandle->Tell();
+            const GUIntBig uncompressed_size = (GUIntBig) poHandle->Tell();
             poHandle->Seek(0, SEEK_SET);
 
             /* Patch with the uncompressed size */
@@ -1779,8 +1782,11 @@ public:
     virtual std::vector<CPLString> GetExtensions();
     virtual VSIArchiveReader* CreateReader(const char* pszZipFileName);
 
+    using VSIFilesystemHandler::Open;
+
     virtual VSIVirtualHandle *Open( const char *pszFilename,
-                                    const char *pszAccess);
+                                    const char *pszAccess,
+                                    bool bSetError );
 
     virtual VSIVirtualHandle *OpenForWrite( const char *pszFilename,
                                             const char *pszAccess );
@@ -1904,7 +1910,8 @@ VSIArchiveReader* VSIZipFilesystemHandler::CreateReader(const char* pszZipFileNa
 /************************************************************************/
 
 VSIVirtualHandle* VSIZipFilesystemHandler::Open( const char *pszFilename,
-                                                 const char *pszAccess)
+                                                 const char *pszAccess,
+                                                 bool /* bSetError */ )
 {
     CPLString osZipInFileName;
 
@@ -2451,7 +2458,7 @@ void* CPLZLibDeflate( const void* ptr,
         return NULL;
     }
 
-    size_t nTmpSize;
+    size_t nTmpSize = 0;
     void* pTmp;
     if( outptr == NULL )
     {
@@ -2528,7 +2535,7 @@ void* CPLZLibInflate( const void* ptr, size_t nBytes,
         return NULL;
     }
 
-    size_t nTmpSize;
+    size_t nTmpSize = 0;
     char* pszTmp;
     if( outptr == NULL )
     {

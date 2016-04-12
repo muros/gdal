@@ -100,6 +100,7 @@ class ACE2Dataset : public GDALPamDataset
 
   public:
                 ACE2Dataset();
+    virtual ~ACE2Dataset() {}
 
     virtual const char *GetProjectionRef(void);
     virtual CPLErr GetGeoTransform( double * );
@@ -116,13 +117,14 @@ class ACE2Dataset : public GDALPamDataset
 
 class ACE2RasterBand : public RawRasterBand
 {
-    public:
+  public:
             ACE2RasterBand(VSILFILE* fpRaw,
                            GDALDataType eDataType,
                            int nXSize, int nYSize);
+    virtual ~ACE2RasterBand() {}
 
-        virtual const char *GetUnitType();
-        virtual char **GetCategoryNames();
+    virtual const char *GetUnitType();
+    virtual char **GetCategoryNames();
 };
 
 /************************************************************************/
@@ -246,7 +248,7 @@ GDALDataset *ACE2Dataset::Open( GDALOpenInfo * poOpenInfo )
     /* Determine southwest coordinates from filename */
 
     /* e.g. 30S120W_5M.ACE2 */
-    char pszLatLonValueString[4];
+    char pszLatLonValueString[4] = { '\0' };
     memset(pszLatLonValueString, 0, 4);
     strncpy(pszLatLonValueString, &pszBasename[0], 2);
     int southWestLat = atoi(pszLatLonValueString);
@@ -268,8 +270,7 @@ GDALDataset *ACE2Dataset::Open( GDALOpenInfo * poOpenInfo )
     else
         return NULL;
 
-
-    GDALDataType eDT;
+    GDALDataType eDT = GDT_Unknown;
     if (strstr(pszBasename, "_CONF_") ||
         strstr(pszBasename, "_QUALITY_") ||
         strstr(pszBasename, "_SOURCE_"))
@@ -366,7 +367,7 @@ GDALDataset *ACE2Dataset::Open( GDALOpenInfo * poOpenInfo )
 /* -------------------------------------------------------------------- */
     poDS->oOvManager.Initialize( poDS, poOpenInfo->pszFilename );
 
-    return( poDS );
+    return poDS;
 }
 
 /************************************************************************/

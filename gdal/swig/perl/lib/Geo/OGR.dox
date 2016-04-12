@@ -89,13 +89,9 @@
 
 
 
-
-
 ## @class Geo::OGR::Driver
-# @brief A vector format driver.
-#
-# This is a convenience class, which provides a vector driver only
-# access to the set of all drivers.
+# @brief A vector format driver. This is a legacy class which
+# should not be used in new code. Use Geo::GDAL::Driver.
 
 ## @method Open
 # The same as Geo::OGR::Open except that only this driver is allowed.
@@ -104,12 +100,6 @@
 # Create a new vector data source using this driver.
 # @param name The data source name.
 # @param options Driver specific dataset creation options. 
-#
-# Usage:
-# \code
-# $ds = Geo::OGR::Driver('GML')->Create('/tmp/x.gml', {PREFIX => $prefix});
-# \endcode
-# @return a new Geo::GDAL::Dataset object.
 
 ## @method Geo::GDAL::Dataset Copy(Geo::GDAL::Dataset source, $name, arrayref options = undef)
 # Copy a vector data source into a new data source with this driver.
@@ -123,14 +113,9 @@
 
 
 
-
-
 ## @class Geo::OGR::DataSource
-# @brief A legacy class for opening vector datasets. Otherwise see
-# Geo::OGR and Geo::GDAL::Dataset.
-#
-# This is a legacy class, which provides methods to ensure a
-# vector driver is used to open a data source.
+# @brief A vector dataset. This is a legacy class which should not be
+# used in new code. Use Geo::GDAL::Dataset.
 
 ## @sub Geo::GDAL::Dataset Open
 # The same as Geo::OGR::Open
@@ -490,6 +475,10 @@
 ## @ignore GetGeometryColumn
 ## @ignore GetGeomType
 
+## @method $GeometryType($field)
+# @param field the name or index of the spatial field.
+# @return the geometry type of the spatial field.
+
 ## @method @GetFieldNames()
 # @return a list of the names of the fields in this layer. The
 # non-geometry field names are first in the list and then the geometry
@@ -513,8 +502,20 @@
 # @isa (Geo::OGR)
 
 ## @cmethod Geo::OGR::Feature new(%schema)
-# @param schema as in GetSchema().
-# @return a new Geo::OGR::Feature object
+# @brief Create a new feature.
+# @param A Geo::OGR::FeatureDefn object or named parameters to create one:
+# - \a Name
+# - \a Fields a list of Geo::OGR::FieldDefn or Geo::OGR::GeomFieldDefn
+# objects or anonymous hashes from which such can be created.
+# - \a GeometryType the geometry type if the feature has only one spatial field.
+# - \a StyleIgnored whether the style can be omitted when fetching features. (default is false)
+#
+# @note Do not mix GeometryType and geometry fields in Fields list.
+#
+# @return a new Geo::OGR::Feature object.
+
+## @method Geo::OGR::Layer Layer()
+# @return the layer to which this feature belongs to or undef.
 
 ## @method $DumpReadable()
 # Write the contents of this feature to stdout.
@@ -543,9 +544,9 @@
 # Get and/or set the data of the feature. The key of the (key,value)
 # pairs of the row is the field name. Special field names FID and
 # Geometry are used for feature id and (single) geometry
-# respectively. The geometry is set and get using the
+# respectively. The geometry/ies is/are set and get using the
 # Geo::OGR::Feature::Geometry method. Field values are set using the
-# Geo::OGR::Feature::SetField method.
+# Geo::OGR::Feature::Field method.
 # @param row [optional] feature data in a hash.
 # @return a reference to feature data in a hash. Spatial fields are
 # returned as Geo::OGR::Geometry objects.
@@ -600,16 +601,24 @@
 ## @ignore GetFieldAsString
 ## @ignore GetFieldAsInteger
 ## @ignore GetFieldAsDouble
+## @ignore GetFieldAsBinary
 ## @ignore GetFieldAsDateTime
 ## @ignore GetFieldAsInteger64
 ## @ignore GetFieldAsDoubleList
 ## @ignore GetFieldAsIntegerList
+## @ignore GetFieldAsInteger64List
 ## @ignore GetFieldAsStringList
 
+## @ignore SetFieldBinary
+## @ignore SetFieldBinaryFromHexString
 ## @ignore SetFieldInteger64
 ## @ignore SetFieldDoubleList
 ## @ignore SetFieldIntegerList
+## @ignore SetFieldInteger64List
 ## @ignore SetFieldStringList
+
+## @ignore IsFieldSet
+## @ignore UnsetField
 
 ## @method SetField($name, @Value)
 # See Field().
@@ -627,7 +636,8 @@
 # scalar, which is then assumed to be a string and parsed, or from a
 # list of values (for example year, month, day for Date).
 # @return in non-void context the value of the field, which may be a
-# scalar or a list, depending on the field type.
+# scalar or a list, depending on the field type. For unset fields the
+# undef value is returned.
 
 ## @ignore SetGeometry
 ## @ignore SetGeometryDirectly
@@ -637,7 +647,7 @@
 ## @ignore SetGeomField
 ## @ignore SetGeomFieldDirectly
 
-## @method $Geometry($name, $geometry)
+## @method Geometry($name, $geometry)
 # @brief Get or set the value of a geometry field.
 # @note This method delivers the functionality of undocumented methods
 # SetGeometry($geometry), SetGeometryDirectly, SetGeomField,
@@ -649,9 +659,9 @@
 # @param name [optional] the name of the spatial field,
 # whose geometry is to be set. If not given, sets or gets the geometry
 # of the first (or the single) spatial field.
-# @param geometry [optional] a Geo::OGR::Geometry object or a hash
-# array from which such can be created (using
-# Geo::OGR::Geometry::new)
+# @param geometry [optional] a Geo::OGR::Geometry object or a
+# reference to a hash from which such can be created (using
+# Geo::OGR::Geometry::new).
 # @return in a non-void context the indicated geometry in the feature
 # as a Geo::OGR::Geometry object. The returned object contains a
 # reference to the actual geometry data in the feature (the geometry
@@ -829,6 +839,7 @@
 ## @sub list Types
 # Field types supported by GDAL. Current list is
 # +list Geo::OGR OFT
+# (However, WideString is not supported.)
 
 ## @sub list JustifyValues
 # Justify values supported by GDAL. Current list is
